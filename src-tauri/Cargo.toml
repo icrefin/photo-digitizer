@@ -1,0 +1,31 @@
+[package]
+name = "photo-digitizer"
+version = "0.1.0"
+edition = "2021"
+description = "Digitize scanned photos: split scan sheets into individual photos, fix orientation, AI-enhance"
+
+[lib]
+name = "photo_digitizer_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "pipeline"
+path = "src/bin/pipeline.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.22"
+anyhow = "1"
+ndarray = "0.17"
+opencv = { version = "0.100", features = ["imgproc", "imgcodecs", "objdetect", "dnn", "calib3d"] }
+ort = { version = "2.0.0-rc.13", features = ["ndarray", "load-dynamic"] }
+
+[profile.release]
+opt-level = 3
+lto = "thin"

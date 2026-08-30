@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Photo Digitizer</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span class="logo">▭</span>
+      <h1>Photo Digitizer</h1>
+    </div>
+    <div class="folder-box">
+      <input id="scanDir" type="text" spellcheck="false" placeholder="Folder containing scanned sheets…" />
+      <button id="btnBrowse" class="ghost">Browse…</button>
+      <button id="btnLoad" class="primary">Load</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Left: file list -->
+    <aside id="sidebar">
+      <div class="side-head">
+        <span>Scan sheets</span>
+        <span id="fileCount" class="muted"></span>
+      </div>
+      <ul id="fileList"></ul>
+    </aside>
+
+    <!-- Center: sheet preview | detected photos -->
+    <section id="content">
+      <div class="toolbar">
+        <div class="crumbs">
+          <span id="currentFile" class="muted">No folder loaded</span>
+        </div>
+        <div class="spacer"></div>
+        <button id="btnSelectAll" class="ghost" disabled>Select all</button>
+        <button id="btnDetectAll" class="primary" disabled>Detect all sheets</button>
+      </div>
+
+      <div id="progressWrap" class="progress-wrap hidden">
+        <div class="progress-label">
+          <span id="progressText">Working…</span>
+          <span class="progress-right"><span id="progressPct" class="muted"></span>
+          <button id="btnCancel" class="ghost small-btn hidden">✕ Cancel</button></span>
+        </div>
+        <div class="progress-bar"><div id="progressFill"></div></div>
+      </div>
+
+      <div id="split">
+        <div id="sheetPane">
+          <div class="pane-title">Original sheet</div>
+          <div id="sheetWrap" class="hidden">
+            <img id="sheetImg" alt="sheet preview" draggable="false" />
+            <svg id="quadOverlay" xmlns="http://www.w3.org/2000/svg"></svg>
+          </div>
+          <div id="cropTools" class="hidden">
+            <span id="cropText" class="muted small crop-text">Drag the corners to adjust the crop, then apply</span>
+            <div class="crop-buttons">
+              <button id="btnCropApply" class="primary">Apply crop</button>
+              <button id="btnCropCancel" class="ghost">Cancel</button>
+            </div>
+          </div>
+          <div id="sheetHint" class="pane-hint muted">Select a sheet on the left to detect its photos.</div>
+        </div>
+        <div id="gridPane">
+          <div id="grid" class="grid"></div>
+          <div id="emptyState" class="empty">
+            <div class="empty-icon">🗂</div>
+            <p>Detect a sheet to see its photos here.<br/>Each sheet is split into individual photos, straightened and trimmed.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right: enhance panel -->
+    <aside id="panel">
+      <h2>Enhance</h2>
+      <p class="muted small">Runs locally — Real-ESRGAN ×4 for resolution, Zhang colorization for faded color.</p>
+      <label class="check">
+        <input type="checkbox" id="optUpscale" checked />
+        <span>AI upscale <small>Real-ESRGAN ×4</small></span>
+      </label>
+      <label class="check">
+        <input type="checkbox" id="optColorize" checked />
+        <span>AI color <small>colorization / restore</small></span>
+      </label>
+      <label class="check">
+        <input type="checkbox" id="optFaces" checked />
+        <span>AI faces <small>GFPGAN v1.4 restoration</small></span>
+      </label>
+      <button id="btnEnhance" class="primary wide" disabled>Enhance selected</button>
+      <div id="enhStatus" class="muted small enh-status"></div>
+
+      <h2>Save</h2>
+      <div class="save-row">
+        <select id="saveFormat">
+          <option value="jpg" selected>JPEG (small)</option>
+          <option value="png">PNG (lossless)</option>
+        </select>
+      </div>
+      <button id="btnSave" class="wide" disabled>Save selected…</button>
+      <div id="saveStatus" class="muted small enh-status"></div>
+
+      <div class="panel-tip muted small">
+        Click a photo to compare original ↔ enhanced. Scroll to zoom each pane, drag to pan, double-click to reset. Use ⟲/⟳ to fix rotation and ✎ to adjust the crop by dragging its corners on the sheet.
+      </div>
+    </aside>
+  </main>
+
+  <!-- Compare modal: fixed two columns, wheel zoom -->
+  <div id="modal" class="modal hidden">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 id="modalTitle">Compare</h3>
+        <div class="modal-info muted small" id="modalInfo"></div>
+        <button id="modalClose" class="ghost">✕</button>
+      </div>
+      <div class="compare2">
+        <div class="zoompane" id="paneBefore">
+          <img id="imgBefore" alt="original" draggable="false" />
+          <div class="tag tag-left">original</div>
+        </div>
+        <div class="zoompane" id="paneAfter">
+          <img id="imgAfter" alt="enhanced" draggable="false" />
+          <div class="tag tag-right" id="tagAfter">enhanced</div>
+          <div id="afterEmpty" class="pane-hint muted hidden">No enhancement yet — select and run Enhance.</div>
+        </div>
+      </div>
+      <div class="modal-foot muted small">scroll = zoom · drag = pan · double-click = reset</div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

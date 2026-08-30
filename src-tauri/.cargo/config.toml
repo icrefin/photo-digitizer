@@ -1,0 +1,9 @@
+[env]
+PKG_CONFIG_PATH = "/opt/homebrew/opt/opencv@4/lib/pkgconfig"
+LIBCLANG_PATH = "/opt/homebrew/opt/llvm/lib"
+# clang-sys probes this binary for default C++ include dirs — must be brew's
+# (the CLT clang on this machine reports a broken partial c++/v1 overlay)
+CLANG_PATH = "/opt/homebrew/opt/llvm/bin/clang"
+# cc-rs must also use brew's clang++ for the generated C++ shims
+CXX = "/opt/homebrew/opt/llvm/bin/clang++"
+CXXFLAGS = "-isystem /opt/homebrew/opt/llvm/include/c++/v1"

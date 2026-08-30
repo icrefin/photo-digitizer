@@ -1,0 +1,30 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Photo Digitizer",
+  "version": "0.1.0",
+  "identifier": "com.yiwang.photo-digitizer",
+  "build": {
+    "frontendDist": "../ui"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "Photo Digitizer",
+        "width": 1480,
+        "height": 960,
+        "minWidth": 1180,
+        "minHeight": 720
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "resources": ["models/*"],
+    "icon": ["icons/icon.png"]
+  }
+}
