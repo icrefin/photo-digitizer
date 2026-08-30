@@ -362,6 +362,52 @@ pub async fn re_extract_photo(
     Ok(job_meta(&id, job))
 }
 
+/// Extract a NEW photo from a user-drawn quad (page coords TL TR BR BL).
+/// Used to separate photos that auto-detection merged into one. The photo
+/// gets the next free index for the sheet and is flagged manual so it
+/// survives later re-detection.
+#[tauri::command]
+pub async fn add_manual_photo(
+    state: State<'_, AppState>,
+    dir: String,
+    file: String,
+    quad: Vec<f64>,
+) -> Result<PhotoMeta, String> {
+    if quad.len() != 8 {
+        return Err("quad must have 8 coordinates".into());
+    }
+    let stem = Path::new(&file)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("photo")
+        .to_string();
+    let id = {
+        let map = state.jobs.lock().unwrap();
+        let mut next = map
+            .iter()
+            .filter(|(_, j)| j.source_file == file)
+            .filter_map(|(id, _)| index_of_id(id))
+            .max()
+            .map_or(0, |m| m + 1);
+        while map.contains_key(&format!("{stem}#{next}")) {
+            next += 1;
+        }
+        format!("{stem}#{next}")
+    };
+    let path = Path::new(&dir).join(&file);
+    let id2 = id.clone();
+    let d =
+        tauri::async_runtime::spawn_blocking(move || service::re_extract(path, quad, id2))
+            .await
+            .map_err(e2s)?
+            .map_err(e2s)?;
+    let mut map = state.jobs.lock().unwrap();
+    let mut job = make_job(&file, &d);
+    job.manual = true;
+    map.insert(id.clone(), job);
+    Ok(job_meta(&id, map.get(&id).ok_or("unknown photo id")?))
+}
+
 #[tauri::command]
 pub async fn enhance_photos(
     app: AppHandle,

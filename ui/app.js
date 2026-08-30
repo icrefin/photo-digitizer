@@ -472,10 +472,121 @@ function enterCropEdit(id) {
 
 function exitCropEdit() {
   previewGen++; // drop any in-flight editing preview
+  drawing = null;
+  if (drawPoly) { drawPoly.remove(); drawPoly = null; }
   state.editing = null;
   overlayNodes = null;
   $("cropTools").classList.add("hidden");
   $("quadOverlay").innerHTML = "";
+}
+
+/* ---------- new photo crop (right-click on the sheet) ----------
+   Use case: auto-detection merged two photos into one. Right-click above
+   the sheet, drag a box around one photo, then apply — it is extracted as
+   a new photo and appears in the grid as a manual (green-box) crop. */
+
+let drawing = null; // { anchor: [x,y] } while the user drags out the box
+let drawPoly = null;
+
+function toImgCoords(cx, cy) {
+  const img = $("sheetImg");
+  const r = img.getBoundingClientRect();
+  return [
+    Math.max(0, Math.min(imgNaturalW(), ((cx - r.left) / r.width) * imgNaturalW())),
+    Math.max(0, Math.min(imgNaturalH(), ((cy - r.top) / r.height) * imgNaturalH())),
+  ];
+}
+
+function startDrawNewCrop() {
+  const file = state.activeFile;
+  if (!file) return toast("Select a sheet first");
+  if (!state.detected.has(file)) return toast("Detect the sheet first");
+  if (state.editing || drawing) return toast("Finish the current crop edit first");
+  if (!imgNaturalW()) return toast("No sheet shown");
+  drawing = { anchor: null };
+  const svg = $("quadOverlay");
+  svg.setAttribute("viewBox", `0 0 ${imgNaturalW()} ${imgNaturalH()}`);
+  positionQuadOverlay();
+  drawPoly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+  drawPoly.setAttribute("fill", "rgba(0,180,255,.12)");
+  drawPoly.setAttribute("stroke", "#00c8ff");
+  drawPoly.setAttribute("stroke-width", "3");
+  drawPoly.setAttribute("stroke-dasharray", "8 6");
+  svg.appendChild(drawPoly);
+  $("cropText").textContent = "Drag on the sheet to draw a crop box for a new photo";
+  $("cropTools").classList.remove("hidden");
+}
+
+function onDrawDown(e) {
+  if (!drawing || e.button !== 0) return;
+  e.preventDefault();
+  drawing.anchor = toImgCoords(e.clientX, e.clientY);
+  const svg = $("quadOverlay");
+  svg.setPointerCapture(e.pointerId);
+  const move = (ev) => {
+    if (!drawing || !drawing.anchor) return;
+    const q = toImgCoords(ev.clientX, ev.clientY);
+    const x0 = Math.min(drawing.anchor[0], q[0]);
+    const y0 = Math.min(drawing.anchor[1], q[1]);
+    const x1 = Math.max(drawing.anchor[0], q[0]);
+    const y1 = Math.max(drawing.anchor[1], q[1]);
+    drawPoly.setAttribute("points", `${x0},${y0} ${x1},${y0} ${x1},${y1} ${x0},${y1}`);
+  };
+  const up = (ev) => {
+    svg.removeEventListener("pointermove", move);
+    svg.removeEventListener("pointerup", up);
+    if (!drawing || !drawing.anchor) return;
+    const q = toImgCoords(ev.clientX, ev.clientY);
+    const x0 = Math.min(drawing.anchor[0], q[0]);
+    const y0 = Math.min(drawing.anchor[1], q[1]);
+    const x1 = Math.max(drawing.anchor[0], q[0]);
+    const y1 = Math.max(drawing.anchor[1], q[1]);
+    finishDraw([[x0, y0], [x1, y0], [x1, y1], [x0, y1]]);
+  };
+  svg.addEventListener("pointermove", move);
+  svg.addEventListener("pointerup", up);
+}
+
+function finishDraw(quad) {
+  drawing = null;
+  if (drawPoly) { drawPoly.remove(); drawPoly = null; }
+  state.editing = { id: null, file: state.activeFile, quad };
+  overlayNodes = null;
+  $("cropText").textContent = "Drag the corners to adjust the new crop, then apply";
+  drawQuadOverlay();
+}
+
+async function applyNewCrop(e) {
+  const sheet = state.sheets.get(e.file);
+  const k = sheet.pageW / imgNaturalW();
+  const quad = e.quad.flatMap((p) => [p[0] * k, p[1] * k]);
+  try {
+    setProgress("Adding photo…", null);
+    const meta = await invoke("add_manual_photo", {
+      dir: state.dir, file: e.file, quad,
+    });
+    state.photos.set(meta.id, meta);
+    // refresh the baked preview so the new crop box is drawn (green)
+    try {
+      previewGen++;
+      const { quads, manual } = quadsForFile(e.file, meta.id, meta.quad);
+      const b64 = await invoke("sheet_preview_with_quads", {
+        dir: state.dir, file: e.file, quads, manual,
+      });
+      const sheet = state.sheets.get(e.file);
+      state.sheets.set(e.file, { ...sheet, b64 });
+      state.editing = null;
+      overlayNodes = null;
+      renderSplit();
+    } catch (_) { /* best effort */ }
+    setProgress(null);
+    toast("Photo added");
+    exitCropEdit();
+    renderGrid();
+  } catch (err) {
+    setProgress(null);
+    toast(`Add photo failed: ${err}`);
+  }
 }
 
 let overlayNodes = null; // { svg, polygon, handles: [circle×4] }
@@ -633,6 +744,7 @@ function imgNaturalH() {
 async function applyCrop() {
   const e = state.editing;
   if (!e) return;
+  if (!e.id) return applyNewCrop(e);
   const sheet = state.sheets.get(e.file);
   const k = sheet.pageW / imgNaturalW();
   const quad = e.quad.flatMap((p) => [p[0] * k, p[1] * k]);
@@ -719,6 +831,11 @@ window.addEventListener("DOMContentLoaded", async () => {
   $("btnCancel").onclick = () => invoke("cancel_enhance").catch(() => {});
   $("btnCropApply").onclick = applyCrop;
   $("btnCropCancel").onclick = exitCropEdit;
+  $("sheetWrap").addEventListener("contextmenu", (e) => {
+    e.preventDefault(); // suppress the webview menu for our crop flow
+    startDrawNewCrop();
+  });
+  $("sheetWrap").addEventListener("pointerdown", onDrawDown);
   $("btnSave").onclick = save;
   $("modalClose").onclick = () => $("modal").classList.add("hidden");
   $("btnResetEnh").onclick = resetEnhancement;

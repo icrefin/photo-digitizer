@@ -21,6 +21,7 @@ pub fn run() {
             cmds::detect_all,
             cmds::rotate_photo,
             cmds::re_extract_photo,
+            cmds::add_manual_photo,
             cmds::sheet_preview_with_quads,
             cmds::enhance_photos,
             cmds::reset_enhancement,
