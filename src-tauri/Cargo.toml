@@ -2,6 +2,7 @@
 name = "photo-digitizer"
 version = "0.1.0"
 edition = "2021"
+default-run = "photo-digitizer"
 description = "Digitize scanned photos: split scan sheets into individual photos, fix orientation, AI-enhance"
 
 [lib]
