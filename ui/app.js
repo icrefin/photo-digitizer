@@ -18,7 +18,198 @@ const state = {
   busy: false,
 };
 
-/* ---------- helpers ---------- */
+/* ---------- language (English / 中文) ---------- */
+
+let lang = localStorage.getItem("lang")
+  || (navigator.language?.toLowerCase().startsWith("zh") ? "zh" : "en");
+
+const I18N = {
+  en: {
+    folderPh: "Folder containing scanned sheets…",
+    browse: "Browse…", load: "Load",
+    scanSheets: "Scan sheets",
+    selectAll: "Select all", detectAll: "Detect all sheets",
+    cancel: "✕ Cancel",
+    originalSheet: "Original sheet",
+    applyCrop: "Apply crop", cancelCrop: "Cancel",
+    sheetHint: "Select a sheet on the left to detect its photos.",
+    empty1: "Detect a sheet to see its photos here.",
+    empty2: "Each sheet is split into individual photos, straightened and trimmed.",
+    enhance: "Enhance",
+    panelDesc: "Runs locally — Real-ESRGAN ×4 for resolution, Zhang colorization for faded color.",
+    optUpscale: "AI upscale", optUpscaleSub: "Real-ESRGAN ×4",
+    optColorize: "AI color", optColorizeSub: "colorization / restore",
+    optFaces: "AI faces", optFacesSub: "GFPGAN v1.4 restoration",
+    enhanceSelected: "Enhance selected",
+    save: "Save",
+    jpgOpt: "JPEG (small)", pngOpt: "PNG (lossless)",
+    saveSelected: "Save selected…",
+    tip: "Click a photo to compare original ↔ enhanced. Scroll to zoom each pane, drag to pan, double-click to reset. Use ⟲/⟳ to fix rotation and ✎ to adjust the crop by dragging its corners on the sheet — a manually cropped photo keeps its crop when sheets are re-detected, and can be reset to its original from the compare window. If two photos were detected as one, right-click the sheet and drag over one of them to extract it as a separate photo.",
+    resetEnh: "Reset to original",
+    compare: "Compare",
+    tagOriginal: "original", tagEnhanced: "enhanced",
+    afterEmpty: "No enhancement yet — select and run Enhance.",
+    modalFoot: "scroll = zoom · drag = pan · double-click = reset",
+    detectProgress: "Detecting photos in {0}…",
+    noPhotos: "{0}: no photos found",
+    detectFailed: "Detection failed: {0}",
+    detectDone: "Detected {0} photos across {1} sheets",
+    selectFirst: "Select photos first",
+    noEnhOpt: "Pick at least one enhancement",
+    cancelled: "Enhancement cancelled",
+    enhancedDone: "Done — {0} photo(s) enhanced.",
+    enhanceFailed: "Enhance failed: {0}",
+    rotateFailed: "Rotate failed: {0}",
+    needDetect: "Detect the sheet first",
+    noQuad: "No quad available for this photo",
+    cropTextEdit: "Drag the corners of #{0} to adjust the crop, then apply",
+    recrop: "Re-cropping…",
+    cropUpdated: "Crop updated",
+    recropFailed: "Re-crop failed: {0}",
+    drawHint: "Drag on the sheet to draw a crop box for a new photo",
+    drawAdjust: "Drag the corners to adjust the new crop, then apply",
+    addingPhoto: "Adding photo…",
+    photoAdded: "Photo added",
+    addFailed: "Add photo failed: {0}",
+    finishCropFirst: "Finish the current crop edit first",
+    selectSheetFirst: "Select a sheet first",
+    noSheet: "No sheet shown",
+    savedTo: "Saved {0} photo(s) → {1}",
+    saveFailed: "Save failed: {0}",
+    pickFailed: "Folder picker failed: {0}",
+    resetDone: "Reset to original — you can enhance again anytime",
+    resetFailed: "Reset failed: {0}",
+    modalInfo: "original {0}  →  enhanced {1}",
+    modalInfoNoEnh: "{0} · run Enhance to see AI output here",
+    stageLoad: "loading AI models…",
+    stageStartUpscale: "starting upscale…",
+    stageUpscale: "upscaling {0}",
+    stageColorize: "colorizing…",
+    stageFaces: "restoring faces {0}",
+    stageDone: "done",
+    mFace: "face", mObject: "object", mNone: "none", mManual: "manual",
+    rotCcw: "Rotate 90° counter-clockwise",
+    rotCw: "Rotate 90° clockwise",
+    adjustCrop: "Adjust the crop on the sheet",
+    manualBadgeTip: "Manually cropped — auto-detection keeps this crop",
+    clickCompare: "Click to compare",
+  },
+  zh: {
+    folderPh: "包含扫描页的文件夹…",
+    browse: "浏览…", load: "加载",
+    scanSheets: "扫描页",
+    selectAll: "全选", detectAll: "检测全部页",
+    cancel: "✕ 取消",
+    originalSheet: "原始扫描页",
+    applyCrop: "应用裁剪", cancelCrop: "取消",
+    sheetHint: "在左侧选择扫描页以检测其中的照片。",
+    empty1: "检测扫描页后可在此查看照片。",
+    empty2: "每页将被拆分为独立的照片，并自动摆正和修边。",
+    enhance: "增强",
+    panelDesc: "本地运行 — Real-ESRGAN ×4 提升分辨率，Zhang 方法为褪色照片修复色彩。",
+    optUpscale: "AI 放大", optUpscaleSub: "Real-ESRGAN ×4",
+    optColorize: "AI 上色", optColorizeSub: "上色 / 修复",
+    optFaces: "AI 人脸", optFacesSub: "GFPGAN v1.4 修复",
+    enhanceSelected: "增强选中项",
+    save: "保存",
+    jpgOpt: "JPEG（小）", pngOpt: "PNG（无损）",
+    saveSelected: "保存选中…",
+    tip: "点击照片可对比原图与增强效果。滚动缩放，拖动平移，双击复位。使用 ⟲/⟳ 修正旋转，✎ 在扫描页上拖动角点调整裁剪 — 手动裁剪过的照片在重新检测时会保留该裁剪，并可在对比窗口中恢复原图。若自动检测将两张照片误合为一张，可在扫描页上右键并拖动框选其中一张，将其单独提取出来。",
+    resetEnh: "恢复原图",
+    compare: "对比",
+    tagOriginal: "原图", tagEnhanced: "增强后",
+    afterEmpty: "尚未增强 — 请选择照片并运行增强。",
+    modalFoot: "滚动 = 缩放 · 拖动 = 平移 · 双击 = 复位",
+    detectProgress: "正在检测 {0} 中的照片…",
+    noPhotos: "{0}：未找到照片",
+    detectFailed: "检测失败：{0}",
+    detectDone: "共检测到 {0} 张照片，来自 {1} 个扫描页",
+    selectFirst: "请先选择照片",
+    noEnhOpt: "请至少选择一种增强方式",
+    cancelled: "增强已取消",
+    enhancedDone: "完成 — 已增强 {0} 张照片。",
+    enhanceFailed: "增强失败：{0}",
+    rotateFailed: "旋转失败：{0}",
+    needDetect: "请先检测该扫描页",
+    noQuad: "该照片没有可调整的裁剪区域",
+    cropTextEdit: "拖动 # {0} 的角点调整裁剪范围，然后应用",
+    recrop: "正在重新裁剪…",
+    cropUpdated: "裁剪已更新",
+    recropFailed: "重新裁剪失败：{0}",
+    drawHint: "在扫描页上拖动，为新照片绘制裁剪框",
+    drawAdjust: "拖动角点调整新裁剪，然后应用",
+    addingPhoto: "正在添加照片…",
+    photoAdded: "照片已添加",
+    addFailed: "添加照片失败：{0}",
+    finishCropFirst: "请先完成当前的裁剪操作",
+    selectSheetFirst: "请先选择扫描页",
+    noSheet: "没有显示扫描页",
+    savedTo: "已保存 {0} 张照片 → {1}",
+    saveFailed: "保存失败：{0}",
+    pickFailed: "选择文件夹失败：{0}",
+    resetDone: "已恢复原图 — 可随时再次增强",
+    resetFailed: "恢复失败：{0}",
+    modalInfo: "原图 {0}  →  增强后 {1}",
+    modalInfoNoEnh: "{0} · 运行增强后可在此查看 AI 输出",
+    stageLoad: "正在加载 AI 模型…",
+    stageStartUpscale: "开始放大…",
+    stageUpscale: "放大中 {0}",
+    stageColorize: "上色中…",
+    stageFaces: "修复人脸 {0}",
+    stageDone: "完成",
+    mFace: "人脸", mObject: "物体", mNone: "无", mManual: "手动",
+    rotCcw: "逆时针旋转 90°",
+    rotCw: "顺时针旋转 90°",
+    adjustCrop: "在扫描页上调整裁剪",
+    manualBadgeTip: "手动裁剪 — 自动检测将保留此裁剪",
+    clickCompare: "点击对比",
+  },
+};
+
+function t(key, ...args) {
+  let s = (I18N[lang] && I18N[lang][key]) ?? I18N.en[key] ?? key;
+  args.forEach((a, i) => { s = s.replace(new RegExp(`\\{${i}\\}`), a); });
+  return s;
+}
+
+function tStage(stage) {
+  if (stage == null) return "";
+  if (stage.startsWith("loading AI models")) return t("stageLoad");
+  if (stage.startsWith("starting upscale")) return t("stageStartUpscale");
+  if (stage.startsWith("upscaling")) return t("stageUpscale", stage.replace(/^upscaling\s*/, "").trim());
+  if (stage.startsWith("colorizing")) return t("stageColorize");
+  if (stage.startsWith("restoring faces")) return t("stageFaces", stage.replace(/^restoring faces\s*/, "").trim());
+  if (stage === "done") return t("stageDone");
+  return stage;
+}
+
+function tMethod(m) {
+  if (!m) return "";
+  if (m === "manual") return t("mManual");
+  const inner = /^manual\s*\(\s*(\w+)\s*\)$/.exec(m);
+  const core = inner ? inner[1] : m;
+  return (inner ? t("mManual") + " (" : "") + (t("m" + core[0].toUpperCase() + core.slice(1)) ?? core) + (inner ? ")" : "");
+}
+
+function applyLang() {
+  document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
+  $("langSel").value = lang;
+  for (const el of document.querySelectorAll("[data-i18n]")) {
+    el.textContent = t(el.dataset.i18n);
+  }
+  for (const el of document.querySelectorAll("[data-i18n-ph]")) {
+    el.placeholder = t(el.dataset.i18nPh);
+  }
+  if ($("modal").classList.contains("hidden")) $("modalTitle").textContent = t("compare");
+  renderFileList();
+  renderSplit();
+  renderGrid();
+  if (state.editing) {
+    $("cropText").textContent = state.editing.id === null
+      ? t("drawAdjust")
+      : t("cropTextEdit", state.editing.id.split("#")[1]);
+  }
+}
 
 function toast(msg, ms = 3200) {
   const t = $("toast");
@@ -123,7 +314,7 @@ function renderSplit() {
 
 async function detectOne(file) {
   try {
-    setProgress(`Detecting photos in ${file}…`, null);
+    setProgress(t("detectProgress", file), null);
     const { sheet_b64, page_w, page_h, photos } = await invoke("detect_one", { dir: state.dir, file });
     state.detected.add(file);
     state.sheets.set(file, { b64: sheet_b64, pageW: page_w, pageH: page_h });
@@ -132,10 +323,10 @@ async function detectOne(file) {
     renderFileList();
     renderSplit();
     renderGrid();
-    if (!photos.length) toast(`${file}: no photos found`);
+    if (!photos.length) toast(t("noPhotos", file));
   } catch (e) {
     setProgress(null);
-    toast(`Detection failed: ${e}`);
+    toast(t("detectFailed", e));
   }
 }
 
@@ -160,10 +351,10 @@ async function detectAll() {
     const n = await invoke("detect_all", { dir: state.dir });
     unlisten();
     setProgress(null);
-    toast(`Detected ${state.photos.size} photos across ${n} sheets`);
+    toast(t("detectDone", state.photos.size, n));
   } catch (e) {
     setProgress(null);
-    toast(`Detection failed: ${e}`);
+    toast(t("detectFailed", e));
   } finally {
     $("btnDetectAll").disabled = false;
   }
@@ -198,7 +389,7 @@ function renderGrid() {
     img.src = m.enh_thumb
       ? `data:image/jpeg;base64,${m.enh_thumb}`
       : `data:image/jpeg;base64,${m.thumb}`;
-    img.title = "Click to compare";
+    img.title = t("clickCompare");
     wrap.appendChild(img);
     wrap.onclick = () => openCompare(m.id);
 
@@ -210,14 +401,14 @@ function renderGrid() {
     } else if (m.rotation || m.method !== "none") {
       const b = document.createElement("span");
       b.className = "badge";
-      b.textContent = m.rotation ? `${m.rotation}° ${m.method}` : m.method;
+      b.textContent = m.rotation ? `${m.rotation}° ${tMethod(m.method)}` : tMethod(m.method);
       card.appendChild(b);
     }
     if (m.manual) {
       const b = document.createElement("span");
       b.className = "badge manual";
       b.textContent = "✎ crop";
-      b.title = "Manually cropped — auto-detection keeps this crop";
+      b.title = t("manualBadgeTip");
       card.appendChild(b);
     }
 
@@ -244,15 +435,15 @@ function renderGrid() {
     rot.className = "rot";
     const bl = document.createElement("button");
     bl.textContent = "⟲";
-    bl.title = "Rotate 90° counter-clockwise";
+    bl.title = t("rotCcw");
     bl.onclick = (e) => { e.stopPropagation(); rotate(m.id, -90); };
     const br = document.createElement("button");
     br.textContent = "⟳";
-    br.title = "Rotate 90° clockwise";
+    br.title = t("rotCw");
     br.onclick = (e) => { e.stopPropagation(); rotate(m.id, 90); };
     const be = document.createElement("button");
     be.textContent = "✎";
-    be.title = "Adjust the crop on the sheet";
+    be.title = t("adjustCrop");
     be.onclick = (e) => { e.stopPropagation(); enterCropEdit(m.id); };
     rot.append(bl, br, be);
     meta.append(name, rot);
@@ -272,7 +463,7 @@ async function rotate(id, deg) {
     state.photos.set(id, meta);
     renderGrid();
   } catch (e) {
-    toast(`Rotate failed: ${e}`);
+    toast(t("rotateFailed", e));
   }
 }
 
@@ -280,18 +471,18 @@ async function rotate(id, deg) {
 
 async function enhance() {
   if (state.busy) return;
-  if (!state.selected.size) return toast("Select photos first");
+  if (!state.selected.size) return toast(t("selectFirst"));
   const ids = [...state.selected];
   const upscale = $("optUpscale").checked;
   const colorize = $("optColorize").checked;
   const faces = $("optFaces").checked;
-  if (!upscale && !colorize && !faces) return toast("Pick at least one enhancement");
+  if (!upscale && !colorize && !faces) return toast(t("noEnhOpt"));
   $("btnEnhance").disabled = true;
   showCancel(true);
   try {
     const unlisten = await listen("enhance-progress", (ev) => {
       const { id, done, total, stage } = ev.payload;
-      const label = `[${done}/${total}] ${id.split("#")[0].slice(-10)}#${id.split("#")[1]} — ${stage}`;
+      const label = `[${done}/${total}] ${id.split("#")[0].slice(-10)}#${id.split("#")[1]} — ${tStage(stage)}`;
       $("enhStatus").textContent = label;
       setProgress(label, total ? done / total : null);
       showCancel(true);
@@ -305,10 +496,10 @@ async function enhance() {
     unlisten2();
     setProgress(null);
     if (cancelled) {
-      $("enhStatus").textContent = "Cancelled.";
-      toast("Enhancement cancelled");
+      $("enhStatus").textContent = t("cancelled");
+      toast(t("cancelled"));
     } else {
-      $("enhStatus").textContent = `Done — ${ids.length} photo(s) enhanced.`;
+      $("enhStatus").textContent = t("enhancedDone", ids.length);
       const last = state.photos.get(ids[ids.length - 1]);
       if (last?.enhanced) openCompare(last.id);
     }
@@ -316,7 +507,7 @@ async function enhance() {
   } catch (e) {
     setProgress(null);
     $("enhStatus").textContent = "";
-    toast(`Enhance failed: ${e}`);
+    toast(t("enhanceFailed", e));
   } finally {
     $("btnEnhance").disabled = false;
   }
@@ -394,8 +585,8 @@ function openCompare(id) {
   $("modalTitle").textContent = m.id;
   const afterDims = dimsAfter(m);
   $("modalInfo").textContent = afterDims
-    ? `original ${dims(m)}  →  enhanced ${afterDims}`
-    : `${dims(m)} · run Enhance to see AI output here`;
+    ? t("modalInfo", dims(m), afterDims)
+    : t("modalInfoNoEnh", dims(m));
   $("btnResetEnh").classList.toggle("hidden", !m.enhanced);
 
   $("imgBefore").src = `data:image/jpeg;base64,${m.thumb}`;
@@ -421,9 +612,9 @@ async function resetEnhancement() {
     state.photos.set(id, meta);
     renderGrid();
     openCompare(id); // refresh the modal: after-pane falls back to empty
-    toast("Reset to original — you can enhance again anytime");
+    toast(t("resetDone"));
   } catch (e) {
-    toast(`Reset failed: ${e}`);
+    toast(t("resetFailed", e));
   }
 }
 
@@ -433,11 +624,11 @@ let dragCorner = -1;
 
 function enterCropEdit(id) {
   const m = state.photos.get(id);
-  if (!m || !m.quad || m.quad.length !== 8) return toast("No quad available for this photo");
+  if (!m || !m.quad || m.quad.length !== 8) return toast(t("noQuad"));
   if (state.activeFile !== m.source_file) {
     selectFile(m.source_file, false);
   }
-  if (!state.detected.has(m.source_file)) return toast("Detect the sheet first");
+  if (!state.detected.has(m.source_file)) return toast(t("needDetect"));
   const sheet = state.sheets.get(m.source_file);
   const img = $("sheetImg");
   const applyMapping = () => {
@@ -455,7 +646,7 @@ function enterCropEdit(id) {
       ],
     };
     overlayNodes = null;
-    $("cropText").textContent = `Drag the corners of #${id.split("#")[1]} to adjust the crop, then apply`;
+    $("cropText").textContent = t("cropTextEdit", id.split("#")[1]);
     $("cropTools").classList.remove("hidden");
     drawQuadOverlay();
   };
@@ -499,10 +690,10 @@ function toImgCoords(cx, cy) {
 
 function startDrawNewCrop() {
   const file = state.activeFile;
-  if (!file) return toast("Select a sheet first");
-  if (!state.detected.has(file)) return toast("Detect the sheet first");
-  if (state.editing || drawing) return toast("Finish the current crop edit first");
-  if (!imgNaturalW()) return toast("No sheet shown");
+  if (!file) return toast(t("selectSheetFirst"));
+  if (!state.detected.has(file)) return toast(t("needDetect"));
+  if (state.editing || drawing) return toast(t("finishCropFirst"));
+  if (!imgNaturalW()) return toast(t("noSheet"));
   drawing = { anchor: null };
   const svg = $("quadOverlay");
   svg.setAttribute("viewBox", `0 0 ${imgNaturalW()} ${imgNaturalH()}`);
@@ -513,7 +704,7 @@ function startDrawNewCrop() {
   drawPoly.setAttribute("stroke-width", "3");
   drawPoly.setAttribute("stroke-dasharray", "8 6");
   svg.appendChild(drawPoly);
-  $("cropText").textContent = "Drag on the sheet to draw a crop box for a new photo";
+  $("cropText").textContent = t("drawHint");
   $("cropTools").classList.remove("hidden");
 }
 
@@ -552,7 +743,7 @@ function finishDraw(quad) {
   if (drawPoly) { drawPoly.remove(); drawPoly = null; }
   state.editing = { id: null, file: state.activeFile, quad };
   overlayNodes = null;
-  $("cropText").textContent = "Drag the corners to adjust the new crop, then apply";
+  $("cropText").textContent = t("drawAdjust");
   drawQuadOverlay();
 }
 
@@ -561,7 +752,7 @@ async function applyNewCrop(e) {
   const k = sheet.pageW / imgNaturalW();
   const quad = e.quad.flatMap((p) => [p[0] * k, p[1] * k]);
   try {
-    setProgress("Adding photo…", null);
+    setProgress(t("addingPhoto"), null);
     const meta = await invoke("add_manual_photo", {
       dir: state.dir, file: e.file, quad,
     });
@@ -580,12 +771,12 @@ async function applyNewCrop(e) {
       renderSplit();
     } catch (_) { /* best effort */ }
     setProgress(null);
-    toast("Photo added");
+    toast(t("photoAdded"));
     exitCropEdit();
     renderGrid();
   } catch (err) {
     setProgress(null);
-    toast(`Add photo failed: ${err}`);
+    toast(t("addFailed", err));
   }
 }
 
@@ -749,7 +940,7 @@ async function applyCrop() {
   const k = sheet.pageW / imgNaturalW();
   const quad = e.quad.flatMap((p) => [p[0] * k, p[1] * k]);
   try {
-    setProgress("Re-cropping…", null);
+    setProgress(t("recrop"), null);
     const meta = await invoke("re_extract_photo", {
       dir: state.dir, file: e.file, id: e.id, quad,
     });
@@ -768,41 +959,46 @@ async function applyCrop() {
       renderSplit();
     } catch (_) { /* best effort */ }
     setProgress(null);
-    toast("Crop updated");
+    toast(t("cropUpdated"));
     exitCropEdit();
     renderGrid();
   } catch (err) {
     setProgress(null);
-    toast(`Re-crop failed: ${err}`);
+    toast(t("recropFailed", err));
   }
 }
 
 /* ---------- save ---------- */
 
 async function save() {
-  if (!state.selected.size) return toast("Select photos first");
+  if (!state.selected.size) return toast(t("selectFirst"));
   const ids = [...state.selected];
   const format = $("saveFormat").value;
   let outDir = null;
   try {
     outDir = await invoke("pick_folder", { save: true });
   } catch (e) {
-    toast(`Folder picker failed: ${e}`);
+    toast(t("pickFailed", e));
     return;
   }
   if (!outDir) return;
   try {
     const saved = await invoke("save_photos", { ids, outDir, format });
-    $("saveStatus").textContent = `Saved ${saved.length} file(s) to ${outDir}`;
-    toast(`Saved ${saved.length} photo(s) → ${outDir}`, 5000);
+    $("saveStatus").textContent = t("savedTo", saved.length, outDir);
+    toast(t("savedTo", saved.length, outDir), 5000);
   } catch (e) {
-    toast(`Save failed: ${e}`);
+    toast(t("saveFailed", e));
   }
 }
 
 /* ---------- wiring ---------- */
 
 window.addEventListener("DOMContentLoaded", async () => {
+  $("langSel").onchange = (e) => {
+    lang = e.target.value;
+    localStorage.setItem("lang", lang);
+    applyLang();
+  };
   $("btnBrowse").onclick = async () => {
     const dir = await invoke("pick_folder", { save: false });
     if (dir) {
@@ -848,6 +1044,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   setupPane("before");
   setupPane("after");
+  applyLang();
 
   try {
     const def = await invoke("default_dir");

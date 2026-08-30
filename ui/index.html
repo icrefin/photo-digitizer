@@ -13,17 +13,21 @@
       <h1>Photo Digitizer</h1>
     </div>
     <div class="folder-box">
-      <input id="scanDir" type="text" spellcheck="false" placeholder="Folder containing scanned sheets…" />
-      <button id="btnBrowse" class="ghost">Browse…</button>
-      <button id="btnLoad" class="primary">Load</button>
+      <input id="scanDir" type="text" spellcheck="false" data-i18n-ph="folderPh" placeholder="Folder containing scanned sheets…" />
+      <button id="btnBrowse" class="ghost" data-i18n="browse">Browse…</button>
+      <button id="btnLoad" class="primary" data-i18n="load">Load</button>
     </div>
+    <select id="langSel" title="Language">
+      <option value="en">English</option>
+      <option value="zh">中文</option>
+    </select>
   </header>
 
   <main>
     <!-- Left: file list -->
     <aside id="sidebar">
       <div class="side-head">
-        <span>Scan sheets</span>
+        <span data-i18n="scanSheets">Scan sheets</span>
         <span id="fileCount" class="muted"></span>
       </div>
       <ul id="fileList"></ul>
@@ -36,40 +40,43 @@
           <span id="currentFile" class="muted">No folder loaded</span>
         </div>
         <div class="spacer"></div>
-        <button id="btnSelectAll" class="ghost" disabled>Select all</button>
-        <button id="btnDetectAll" class="primary" disabled>Detect all sheets</button>
+        <button id="btnSelectAll" class="ghost" disabled data-i18n="selectAll">Select all</button>
+        <button id="btnDetectAll" class="primary" disabled data-i18n="detectAll">Detect all sheets</button>
       </div>
 
       <div id="progressWrap" class="progress-wrap hidden">
         <div class="progress-label">
           <span id="progressText">Working…</span>
           <span class="progress-right"><span id="progressPct" class="muted"></span>
-          <button id="btnCancel" class="ghost small-btn hidden">✕ Cancel</button></span>
+          <button id="btnCancel" class="ghost small-btn hidden" data-i18n="cancel">✕ Cancel</button></span>
         </div>
         <div class="progress-bar"><div id="progressFill"></div></div>
       </div>
 
       <div id="split">
         <div id="sheetPane">
-          <div class="pane-title">Original sheet</div>
+          <div class="pane-title" data-i18n="originalSheet">Original sheet</div>
           <div id="sheetWrap" class="hidden">
             <img id="sheetImg" alt="sheet preview" draggable="false" />
             <svg id="quadOverlay" xmlns="http://www.w3.org/2000/svg"></svg>
           </div>
           <div id="cropTools" class="hidden">
-            <span id="cropText" class="muted small crop-text">Drag the corners to adjust the crop, then apply</span>
+            <span id="cropText" class="muted small crop-text"></span>
             <div class="crop-buttons">
-              <button id="btnCropApply" class="primary">Apply crop</button>
-              <button id="btnCropCancel" class="ghost">Cancel</button>
+              <button id="btnCropApply" class="primary" data-i18n="applyCrop">Apply crop</button>
+              <button id="btnCropCancel" class="ghost" data-i18n="cancelCrop">Cancel</button>
             </div>
           </div>
-          <div id="sheetHint" class="pane-hint muted">Select a sheet on the left to detect its photos.</div>
+          <div id="sheetHint" class="pane-hint muted" data-i18n="sheetHint">Select a sheet on the left to detect its photos.</div>
         </div>
         <div id="gridPane">
           <div id="grid" class="grid"></div>
           <div id="emptyState" class="empty">
             <div class="empty-icon">🗂</div>
-            <p>Detect a sheet to see its photos here.<br/>Each sheet is split into individual photos, straightened and trimmed.</p>
+            <p>
+              <span data-i18n="empty1">Detect a sheet to see its photos here.</span><br/>
+              <span data-i18n="empty2">Each sheet is split into individual photos, straightened and trimmed.</span>
+            </p>
           </div>
         </div>
       </div>
@@ -77,36 +84,34 @@
 
     <!-- Right: enhance panel -->
     <aside id="panel">
-      <h2>Enhance</h2>
-      <p class="muted small">Runs locally — Real-ESRGAN ×4 for resolution, Zhang colorization for faded color.</p>
+      <h2 data-i18n="enhance">Enhance</h2>
+      <p class="muted small" data-i18n="panelDesc">Runs locally — Real-ESRGAN ×4 for resolution, Zhang colorization for faded color.</p>
       <label class="check">
         <input type="checkbox" id="optUpscale" checked />
-        <span>AI upscale <small>Real-ESRGAN ×4</small></span>
+        <span data-i18n="optUpscale">AI upscale</span> <small><span data-i18n="optUpscaleSub">Real-ESRGAN ×4</span></small>
       </label>
       <label class="check">
         <input type="checkbox" id="optColorize" checked />
-        <span>AI color <small>colorization / restore</small></span>
+        <span data-i18n="optColorize">AI color</span> <small><span data-i18n="optColorizeSub">colorization / restore</span></small>
       </label>
       <label class="check">
         <input type="checkbox" id="optFaces" checked />
-        <span>AI faces <small>GFPGAN v1.4 restoration</small></span>
+        <span data-i18n="optFaces">AI faces</span> <small><span data-i18n="optFacesSub">GFPGAN v1.4 restoration</span></small>
       </label>
-      <button id="btnEnhance" class="primary wide" disabled>Enhance selected</button>
+      <button id="btnEnhance" class="primary wide" disabled data-i18n="enhanceSelected">Enhance selected</button>
       <div id="enhStatus" class="muted small enh-status"></div>
 
-      <h2>Save</h2>
+      <h2 data-i18n="save">Save</h2>
       <div class="save-row">
         <select id="saveFormat">
-          <option value="jpg" selected>JPEG (small)</option>
-          <option value="png">PNG (lossless)</option>
+          <option value="jpg" selected data-i18n="jpgOpt">JPEG (small)</option>
+          <option value="png" data-i18n="pngOpt">PNG (lossless)</option>
         </select>
       </div>
-      <button id="btnSave" class="wide" disabled>Save selected…</button>
+      <button id="btnSave" class="wide" disabled data-i18n="saveSelected">Save selected…</button>
       <div id="saveStatus" class="muted small enh-status"></div>
 
-      <div class="panel-tip muted small">
-        Click a photo to compare original ↔ enhanced. Scroll to zoom each pane, drag to pan, double-click to reset. Use ⟲/⟳ to fix rotation and ✎ to adjust the crop by dragging its corners on the sheet — a manually cropped photo keeps its crop when sheets are re-detected, and can be reset to its original from the compare window. If two photos were detected as one, right-click the sheet and drag over one of them to extract it as a separate photo.
-      </div>
+      <div class="panel-tip muted small" data-i18n="tip">Click a photo to compare original ↔ enhanced. Scroll to zoom each pane, drag to pan, double-click to reset. Use ⟲/⟳ to fix rotation and ✎ to adjust the crop by dragging its corners on the sheet — a manually cropped photo keeps its crop when sheets are re-detected, and can be reset to its original from the compare window. If two photos were detected as one, right-click the sheet and drag over one of them to extract it as a separate photo.</div>
     </aside>
   </main>
 
@@ -117,21 +122,21 @@
         <h3 id="modalTitle">Compare</h3>
         <div class="modal-info muted small" id="modalInfo"></div>
         <div class="spacer"></div>
-        <button id="btnResetEnh" class="ghost hidden" title="Discard the enhancement and restore the original">Reset to original</button>
+        <button id="btnResetEnh" class="ghost hidden" data-i18n="resetEnh" title="Discard the enhancement and restore the original">Reset to original</button>
         <button id="modalClose" class="ghost">✕</button>
       </div>
       <div class="compare2">
         <div class="zoompane" id="paneBefore">
           <img id="imgBefore" alt="original" draggable="false" />
-          <div class="tag tag-left">original</div>
+          <div class="tag tag-left" data-i18n="tagOriginal">original</div>
         </div>
         <div class="zoompane" id="paneAfter">
           <img id="imgAfter" alt="enhanced" draggable="false" />
-          <div class="tag tag-right" id="tagAfter">enhanced</div>
-          <div id="afterEmpty" class="pane-hint muted hidden">No enhancement yet — select and run Enhance.</div>
+          <div class="tag tag-right" id="tagAfter" data-i18n="tagEnhanced">enhanced</div>
+          <div id="afterEmpty" class="pane-hint muted hidden" data-i18n="afterEmpty">No enhancement yet — select and run Enhance.</div>
         </div>
       </div>
-      <div class="modal-foot muted small">scroll = zoom · drag = pan · double-click = reset</div>
+      <div class="modal-foot muted small" data-i18n="modalFoot">scroll = zoom · drag = pan · double-click = reset</div>
     </div>
   </div>
 
