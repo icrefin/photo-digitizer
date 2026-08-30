@@ -3,3 +3,6 @@ src-tauri/target/
 src-tauri/models/
 _pipeline_out/
 .DS_Store
+
+# Playwright test artifacts
+.playwright-mcp/

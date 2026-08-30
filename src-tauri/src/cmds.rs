@@ -493,13 +493,63 @@ pub async fn save_photos(
     .map_err(e2s)?
 }
 
+/// Show the native folder picker. With `save = true` (choosing the save
+/// destination) the confirm button reads "Save"; otherwise it keeps the
+/// system default label.
 #[tauri::command]
-pub async fn pick_folder(app: AppHandle) -> Result<Option<String>, String> {
-    use tauri_plugin_dialog::DialogExt;
-    tauri::async_runtime::spawn_blocking(move || {
-        let picked = app.dialog().file().blocking_pick_folder().map(|p| p.to_string());
-        Ok::<Option<String>, String>(picked)
-    })
-    .await
-    .map_err(e2s)?
+pub async fn pick_folder(app: AppHandle, save: bool) -> Result<Option<String>, String> {
+    #[cfg(target_os = "macos")]
+    {
+        // NSOpenPanel's confirm-button text is not exposed by tauri-plugin-dialog
+        // / rfd, so drive AppKit directly and run the modal on the main thread.
+        let (tx, rx) = std::sync::mpsc::channel();
+        app.run_on_main_thread(move || {
+            let _ = tx.send(native_macos_folder_picker(save));
+        })
+        .map_err(e2s)?;
+        rx.recv().map_err(e2s)?
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        use tauri_plugin_dialog::DialogExt;
+        tauri::async_runtime::spawn_blocking(move || {
+            let picked = app.dialog().file().blocking_pick_folder().map(|p| p.to_string());
+            Ok::<Option<String>, String>(picked)
+        })
+        .await
+        .map_err(e2s)?
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn native_macos_folder_picker(save: bool) -> Result<Option<String>, String> {
+    use objc2::MainThreadMarker;
+    use objc2_app_kit::{NSModalResponse, NSOpenPanel};
+    use objc2_foundation::NSString;
+
+    // NSModalResponseOK == 1; the generated bindings only name Stop/Abort.
+    const OK: NSModalResponse = 1;
+
+    let mtm = MainThreadMarker::new().expect("folder picker must run on the main thread");
+    let panel = NSOpenPanel::openPanel(mtm);
+    panel.setCanChooseDirectories(true);
+    panel.setCanChooseFiles(false);
+    panel.setAllowsMultipleSelection(false);
+    panel.setCanCreateDirectories(true);
+    if save {
+        let prompt = NSString::from_str("Save");
+        let title = NSString::from_str("Choose where to save the photos");
+        panel.setPrompt(Some(&prompt));
+        panel.setTitle(Some(&title));
+    }
+    if panel.runModal() != OK {
+        return Ok(None);
+    }
+    let Some(url) = panel.URL() else {
+        return Ok(None);
+    };
+    let Some(path) = url.path() else {
+        return Ok(None);
+    };
+    Ok(Some(path.to_string()))
 }

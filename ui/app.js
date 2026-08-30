@@ -602,9 +602,14 @@ async function regenPreviewNow() {
 }
 
 /// All quads for a file sorted by photo index, with `editId`'s quad replaced.
-/// Returns { quads, manual }: `manual` parallel-marks user-adjusted crops so
-/// the preview draws them green.
+/// Returns { quads, manual } in page coordinates (flat, 8 numbers each);
+/// `manual` parallel-marks user-adjusted crops so the preview draws them green.
+/// `editQuad` may be flat (as returned by the backend) or [[x,y]×4].
 function quadsForFile(file, editId, editQuad) {
+  const flat =
+    editQuad.length === 8 && typeof editQuad[0] === "number"
+      ? editQuad
+      : editQuad.flatMap((p) => [p[0], p[1]]);
   const metas = [...state.photos.values()]
     .filter((m) => m.source_file === file && m.quad && m.quad.length === 8)
     .sort((a, b) => Number(a.id.split("#")[1]) - Number(b.id.split("#")[1]));
@@ -612,7 +617,7 @@ function quadsForFile(file, editId, editQuad) {
   const manual = [];
   for (const m of metas) {
     const editing = m.id === editId;
-    quads.push(editing ? editQuad.flatMap((p) => [p[0], p[1]]) : m.quad);
+    quads.push(editing ? flat : m.quad);
     manual.push(editing || !!m.manual);
   }
   return { quads, manual };
@@ -668,7 +673,7 @@ async function save() {
   const format = $("saveFormat").value;
   let outDir = null;
   try {
-    outDir = await invoke("pick_folder");
+    outDir = await invoke("pick_folder", { save: true });
   } catch (e) {
     toast(`Folder picker failed: ${e}`);
     return;
@@ -687,7 +692,7 @@ async function save() {
 
 window.addEventListener("DOMContentLoaded", async () => {
   $("btnBrowse").onclick = async () => {
-    const dir = await invoke("pick_folder");
+    const dir = await invoke("pick_folder", { save: false });
     if (dir) {
       $("scanDir").value = dir;
       await loadFolder(dir);
