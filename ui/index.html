@@ -105,7 +105,7 @@
       <div id="saveStatus" class="muted small enh-status"></div>
 
       <div class="panel-tip muted small">
-        Click a photo to compare original ↔ enhanced. Scroll to zoom each pane, drag to pan, double-click to reset. Use ⟲/⟳ to fix rotation and ✎ to adjust the crop by dragging its corners on the sheet.
+        Click a photo to compare original ↔ enhanced. Scroll to zoom each pane, drag to pan, double-click to reset. Use ⟲/⟳ to fix rotation and ✎ to adjust the crop by dragging its corners on the sheet — a manually cropped photo keeps its crop when sheets are re-detected, and can be reset to its original from the compare window.
       </div>
     </aside>
   </main>
@@ -116,6 +116,8 @@
       <div class="modal-head">
         <h3 id="modalTitle">Compare</h3>
         <div class="modal-info muted small" id="modalInfo"></div>
+        <div class="spacer"></div>
+        <button id="btnResetEnh" class="ghost hidden" title="Discard the enhancement and restore the original">Reset to original</button>
         <button id="modalClose" class="ghost">✕</button>
       </div>
       <div class="compare2">

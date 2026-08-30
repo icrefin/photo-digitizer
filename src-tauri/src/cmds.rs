@@ -17,6 +17,7 @@ pub struct AppState {
     jobs: Mutex<HashMap<String, Job>>,
 }
 
+#[derive(Clone)]
 struct Job {
     source_file: String,
     extracted: PathBuf,
@@ -26,9 +27,13 @@ struct Job {
     rotation: i32,
     method: String,
     quad: Vec<f64>,
+    /// Set once the user adjusted this photo's crop by hand: re-detection
+    /// keeps this job's quad instead of the auto-detected one.
+    manual: bool,
     enhanced: Option<EnhancedInfo>,
 }
 
+#[derive(Clone)]
 struct EnhancedInfo {
     path: PathBuf,
     thumb_b64: String,
@@ -46,6 +51,7 @@ pub struct PhotoMeta {
     rotation: i32,
     method: String,
     quad: Vec<f64>,
+    manual: bool,
     enhanced: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     enh_thumb: Option<String>,
@@ -108,6 +114,7 @@ fn job_meta(id: &str, job: &Job) -> PhotoMeta {
         rotation: job.rotation,
         method: job.method.clone(),
         quad: job.quad.clone(),
+        manual: job.manual,
         enhanced: job.enhanced.is_some(),
         enh_thumb: job.enhanced.as_ref().map(|e| e.thumb_b64.clone()),
         enh_width: job.enhanced.as_ref().map(|e| e.width),
@@ -125,8 +132,48 @@ fn make_job(source_file: &str, d: &crate::service::DetectedPhoto) -> Job {
         rotation: d.rotation,
         method: d.method.clone(),
         quad: d.quad.clone(),
+        manual: false,
         enhanced: None,
     }
+}
+
+/// Photo index for a job id (`stem#index`).
+fn index_of_id(id: &str) -> Option<usize> {
+    id.rsplit('#').next()?.parse().ok()
+}
+
+/// (index, quad) of every manually-cropped photo on one sheet, sorted by index.
+fn manual_quads_for(map: &HashMap<String, Job>, file: &str) -> Vec<(usize, Vec<f64>)> {
+    let mut out: Vec<(usize, Vec<f64>)> = map
+        .iter()
+        .filter(|(_, j)| j.manual && j.source_file == file && j.quad.len() == 8)
+        .filter_map(|(id, j)| index_of_id(id).map(|i| (i, j.quad.clone())))
+        .collect();
+    out.sort_by_key(|(i, _)| *i);
+    out
+}
+
+/// Keep every manually-cropped job for a sheet across a fresh detection:
+/// colliding fresh photos fall back to the manual job's metadata.
+fn merge_detected(
+    map: &mut HashMap<String, Job>,
+    file: &str,
+    detected: &[crate::service::DetectedPhoto],
+) -> Vec<PhotoMeta> {
+    detected
+        .iter()
+        .filter_map(|d| {
+            if let Some(existing) = map.get(&d.id) {
+                if existing.manual {
+                    return Some(job_meta(&d.id, existing));
+                }
+            }
+            let job = make_job(file, d);
+            let m = job_meta(&d.id, &job);
+            map.insert(d.id.clone(), job);
+            Some(m)
+        })
+        .collect()
 }
 
 #[tauri::command]
@@ -146,21 +193,17 @@ pub async fn detect_one(
     file: String,
 ) -> Result<DetectedSheet, String> {
     let path = Path::new(&dir).join(&file);
-    let detected = tauri::async_runtime::spawn_blocking(move || service::detect_file(path))
-        .await
-        .map_err(e2s)?
-        .map_err(e2s)?;
+    let manual = {
+        let map = state.jobs.lock().unwrap();
+        manual_quads_for(&map, &file)
+    };
+    let detected =
+        tauri::async_runtime::spawn_blocking(move || service::detect_file(path, manual))
+            .await
+            .map_err(e2s)?
+            .map_err(e2s)?;
     let mut map = state.jobs.lock().unwrap();
-    let photos = detected
-        .photos
-        .iter()
-        .map(|d| {
-            let job = make_job(&file, d);
-            let m = job_meta(&d.id, &job);
-            map.insert(d.id.clone(), job);
-            m
-        })
-        .collect();
+    let photos = merge_detected(&mut map, &file, &detected.photos);
     Ok(DetectedSheet {
         sheet_b64: detected.sheet_b64,
         page_w: detected.page_w,
@@ -175,27 +218,42 @@ pub async fn detect_all(
     state: State<'_, AppState>,
     dir: String,
 ) -> Result<usize, String> {
-    paths::clean_jobs();
+    // Manually-cropped jobs survive both the temp-file cleanup and the fresh
+    // detection run for their sheet.
+    let preserved: Vec<(String, Job)> = {
+        let map = state.jobs.lock().unwrap();
+        map.iter()
+            .filter(|(_, j)| j.manual)
+            .map(|(id, j)| (id.clone(), j.clone()))
+            .collect()
+    };
+    let keep: Vec<PathBuf> = preserved
+        .iter()
+        .flat_map(|(_, j)| {
+            let mut v = vec![j.extracted.clone()];
+            if let Some(e) = &j.enhanced {
+                v.push(e.path.clone());
+            }
+            v
+        })
+        .collect();
+    paths::clean_jobs(&keep);
     std::fs::create_dir_all(paths::jobs_dir()).map_err(e2s)?;
     let files = list_images(Path::new(&dir))?;
     let total = files.len();
     for (i, file) in files.iter().enumerate() {
         let path = Path::new(&dir).join(file);
-        let detected = tauri::async_runtime::spawn_blocking(move || service::detect_file(path))
-            .await
-            .map_err(e2s)?
-            .map_err(e2s)?;
+        let manual = {
+            let map = state.jobs.lock().unwrap();
+            manual_quads_for(&map, file)
+        };
+        let detected =
+            tauri::async_runtime::spawn_blocking(move || service::detect_file(path, manual))
+                .await
+                .map_err(e2s)?
+                .map_err(e2s)?;
         let mut map = state.jobs.lock().unwrap();
-        let metas = detected
-            .photos
-            .iter()
-            .map(|d| {
-                let job = make_job(file, d);
-                let m = job_meta(&d.id, &job);
-                map.insert(d.id.clone(), job);
-                m
-            })
-            .collect();
+        let metas = merge_detected(&mut map, file, &detected.photos);
         let sheet_b64 = detected.sheet_b64;
         let (page_w, page_h) = (detected.page_w, detected.page_h);
         drop(map);
@@ -203,6 +261,12 @@ pub async fn detect_all(
             "file-detected",
             FileDetected { file: file.clone(), done: i + 1, total, sheet_b64, page_w, page_h, photos: metas },
         );
+    }
+    {
+        let mut map = state.jobs.lock().unwrap();
+        for (id, job) in preserved {
+            map.entry(id).or_insert(job);
+        }
     }
     Ok(total)
 }
@@ -233,14 +297,15 @@ pub async fn rotate_photo(
     Ok(job_meta(&id, job))
 }
 
-/// Re-crop a photo with a user-adjusted quad (page coords, TL TR BR BL).
 /// Regenerate the sheet preview with a given set of quads (used after a
 /// manual crop so the drawn boxes reflect the adjusted boundaries).
+/// `manual[i] == true` draws quad i as a user-adjusted crop box.
 #[tauri::command]
 pub async fn sheet_preview_with_quads(
     dir: String,
     file: String,
     quads: Vec<Vec<f64>>,
+    manual: Vec<bool>,
 ) -> Result<String, String> {
     let path = Path::new(&dir).join(&file);
     tauri::async_runtime::spawn_blocking(move || -> Result<String, String> {
@@ -257,7 +322,7 @@ pub async fn sheet_preview_with_quads(
                 Point2f::new(q[6] as f32, q[7] as f32),
             ]);
         }
-        let vis = crate::detect::draw_debug(&page, &converted).map_err(e2s)?;
+        let vis = crate::detect::draw_debug(&page, &converted, &manual).map_err(e2s)?;
         let jpg = crate::detect::encode_jpeg(&vis, 1000, 85).map_err(e2s)?;
         Ok(base64::engine::general_purpose::STANDARD.encode(&jpg))
     })
@@ -292,6 +357,7 @@ pub async fn re_extract_photo(
     job.thumb_b64 = d.thumb_b64.clone();
     job.width = d.width;
     job.height = d.height;
+    job.manual = true; // auto-detection must never override this crop again
     job.enhanced = None; // previous enhancement no longer matches the new crop
     Ok(job_meta(&id, job))
 }
@@ -364,6 +430,23 @@ pub async fn enhance_photos(
 pub async fn cancel_enhance() -> Result<(), String> {
     service::cancel_enhance();
     Ok(())
+}
+
+/// Discard a photo's enhancement result, restoring it to the original
+/// (post-crop, post-rotation) extraction. The user can re-enhance afterwards.
+#[tauri::command]
+pub async fn reset_enhancement(state: State<'_, AppState>, id: String) -> Result<PhotoMeta, String> {
+    let stale = {
+        let mut map = state.jobs.lock().unwrap();
+        let job = map.get_mut(&id).ok_or("unknown photo id")?;
+        job.enhanced.take().map(|e| e.path)
+    };
+    if let Some(p) = stale {
+        let _ = std::fs::remove_file(p); // best effort: temp file only
+    }
+    let map = state.jobs.lock().unwrap();
+    let job = map.get(&id).ok_or("unknown photo id")?;
+    Ok(job_meta(&id, job))
 }
 
 #[tauri::command]

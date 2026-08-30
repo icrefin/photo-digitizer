@@ -14,6 +14,7 @@ const state = {
   selected: new Set(), // ids
   detected: new Set(), // file names processed
   activeFile: null,
+  compareId: null,     // id shown in the compare modal
   busy: false,
 };
 
@@ -212,6 +213,13 @@ function renderGrid() {
       b.textContent = m.rotation ? `${m.rotation}° ${m.method}` : m.method;
       card.appendChild(b);
     }
+    if (m.manual) {
+      const b = document.createElement("span");
+      b.className = "badge manual";
+      b.textContent = "✎ crop";
+      b.title = "Manually cropped — auto-detection keeps this crop";
+      card.appendChild(b);
+    }
 
     const check = document.createElement("input");
     check.type = "checkbox";
@@ -382,11 +390,13 @@ function setupPane(key) {
 function openCompare(id) {
   const m = state.photos.get(id);
   if (!m) return;
+  state.compareId = id;
   $("modalTitle").textContent = m.id;
   const afterDims = dimsAfter(m);
   $("modalInfo").textContent = afterDims
     ? `original ${dims(m)}  →  enhanced ${afterDims}`
     : `${dims(m)} · run Enhance to see AI output here`;
+  $("btnResetEnh").classList.toggle("hidden", !m.enhanced);
 
   $("imgBefore").src = `data:image/jpeg;base64,${m.thumb}`;
   if (m.enh_thumb) {
@@ -399,6 +409,22 @@ function openCompare(id) {
   resetZoom("before");
   resetZoom("after");
   $("modal").classList.remove("hidden");
+}
+
+/* ---------- reset enhancement ---------- */
+
+async function resetEnhancement() {
+  const id = state.compareId;
+  if (!id) return;
+  try {
+    const meta = await invoke("reset_enhancement", { id });
+    state.photos.set(id, meta);
+    renderGrid();
+    openCompare(id); // refresh the modal: after-pane falls back to empty
+    toast("Reset to original — you can enhance again anytime");
+  } catch (e) {
+    toast(`Reset failed: ${e}`);
+  }
 }
 
 /* ---------- manual crop editor ---------- */
@@ -445,6 +471,7 @@ function enterCropEdit(id) {
 }
 
 function exitCropEdit() {
+  previewGen++; // drop any in-flight editing preview
   state.editing = null;
   overlayNodes = null;
   $("cropTools").classList.add("hidden");
@@ -541,8 +568,10 @@ function onHandleDown(e) {
 }
 
 // After a drag ends, refresh the baked preview so the drawn box reflects the
-// adjusted crop boundary.
+// adjusted crop boundary. A generation counter discards stale responses so an
+// in-flight preview can never overwrite a newer one (e.g. after Apply crop).
 let regenTimer = null;
+let previewGen = 0;
 function regenPreviewDebounced() {
   clearTimeout(regenTimer);
   regenTimer = setTimeout(regenPreviewNow, 250);
@@ -551,11 +580,17 @@ function regenPreviewDebounced() {
 async function regenPreviewNow() {
   const e = state.editing;
   if (!e) return;
-  const quads = quadsForFile(e.file, e.id, e.quad);
+  const gen = ++previewGen;
+  // quadsForFile speaks page coordinates; the editing quad is in preview px
+  const sheet = state.sheets.get(e.file);
+  const k = sheet ? sheet.pageW / imgNaturalW() : 1;
+  const quadPage = e.quad.flatMap((p) => [p[0] * k, p[1] * k]);
+  const { quads, manual } = quadsForFile(e.file, e.id, quadPage);
   try {
     const b64 = await invoke("sheet_preview_with_quads", {
-      dir: state.dir, file: e.file, quads,
+      dir: state.dir, file: e.file, quads, manual,
     });
+    if (gen !== previewGen) return; // superseded by a newer edit or Apply
     if (state.editing && state.editing.file === e.file) {
       $("sheetImg").src = `data:image/jpeg;base64,${b64}`;
     } else if (state.activeFile === e.file) {
@@ -567,13 +602,20 @@ async function regenPreviewNow() {
 }
 
 /// All quads for a file sorted by photo index, with `editId`'s quad replaced.
+/// Returns { quads, manual }: `manual` parallel-marks user-adjusted crops so
+/// the preview draws them green.
 function quadsForFile(file, editId, editQuad) {
   const metas = [...state.photos.values()]
     .filter((m) => m.source_file === file && m.quad && m.quad.length === 8)
     .sort((a, b) => Number(a.id.split("#")[1]) - Number(b.id.split("#")[1]));
-  return metas.map((m) =>
-    m.id === editId ? editQuad.flatMap((p) => [p[0], p[1]]) : m.quad
-  );
+  const quads = [];
+  const manual = [];
+  for (const m of metas) {
+    const editing = m.id === editId;
+    quads.push(editing ? editQuad.flatMap((p) => [p[0], p[1]]) : m.quad);
+    manual.push(editing || !!m.manual);
+  }
+  return { quads, manual };
 }
 
 function imgNaturalW() {
@@ -597,9 +639,10 @@ async function applyCrop() {
     state.photos.set(e.id, meta);
     // refresh the baked preview: the drawn box now reflects the new crop
     try {
-      const quads = quadsForFile(e.file, e.id, meta.quad);
+      previewGen++; // invalidate any in-flight editing preview
+      const { quads, manual } = quadsForFile(e.file, e.id, meta.quad);
       const b64 = await invoke("sheet_preview_with_quads", {
-        dir: state.dir, file: e.file, quads,
+        dir: state.dir, file: e.file, quads, manual,
       });
       const sheet = state.sheets.get(e.file);
       state.sheets.set(e.file, { ...sheet, b64 });
@@ -673,6 +716,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   $("btnCropCancel").onclick = exitCropEdit;
   $("btnSave").onclick = save;
   $("modalClose").onclick = () => $("modal").classList.add("hidden");
+  $("btnResetEnh").onclick = resetEnhancement;
   $("modal").onclick = (e) => {
     if (e.target === $("modal")) $("modal").classList.add("hidden");
   };

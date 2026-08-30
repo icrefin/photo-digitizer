@@ -71,8 +71,21 @@ pub fn jobs_dir() -> PathBuf {
     std::env::temp_dir().join("photo-digitizer-jobs")
 }
 
-pub fn clean_jobs() {
-    let _ = std::fs::remove_dir_all(jobs_dir());
+pub fn clean_jobs(keep: &[PathBuf]) {
+    let Ok(entries) = std::fs::read_dir(jobs_dir()) else {
+        return;
+    };
+    for e in entries.flatten() {
+        let p = e.path();
+        if keep.iter().any(|k| k == &p) {
+            continue;
+        }
+        let _ = if p.is_dir() {
+            std::fs::remove_dir_all(&p)
+        } else {
+            std::fs::remove_file(&p)
+        };
+    }
 }
 
 /// Default folder shown in the app on launch.

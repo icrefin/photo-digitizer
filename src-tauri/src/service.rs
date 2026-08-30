@@ -66,6 +66,10 @@ pub type ProgressCb = Box<dyn FnMut(usize, usize, &str) + Send>;
 enum Msg {
     Detect {
         path: PathBuf,
+        /// Page-space quads of photos the user manually cropped on this sheet
+        /// (photo index, TL TR BR BL): their boxes override the fresh ones in
+        /// the preview and re-detection must not resurrect auto crops for them.
+        manual: Vec<(usize, Vec<f64>)>,
         reply: Sender<Result<SheetDetected>>,
     },
     ReExtract {
@@ -107,7 +111,7 @@ fn run_loop(rx: Receiver<Msg>) {
     let mut enh: Option<Enhancers> = None;
     while let Ok(msg) = rx.recv() {
         match msg {
-            Msg::Detect { path, reply } => {
+            Msg::Detect { path, manual, reply } => {
                 let r = (|| -> Result<SheetDetected> {
                     std::fs::create_dir_all(paths::jobs_dir())?;
                     let d = det.get_or_insert_with(|| {
@@ -115,7 +119,31 @@ fn run_loop(rx: Receiver<Msg>) {
                     });
                     let page = enhance::load_mat(&path)?;
                     let (quads, photos) = pipeline::detect_and_extract(&page, d)?;
-                    let sheet_jpg = pipeline::sheet_preview(&page, &quads)?;
+                    // Overlay manual crop boxes so the preview keeps showing
+                    // the user's adjusted boundaries after a re-detection.
+                    let mut vis_quads = quads.clone();
+                    let mut vis_manual = vec![false; vis_quads.len()];
+                    let mut manual = manual;
+                    manual.sort_by_key(|(i, _)| *i);
+                    for (idx, flat) in &manual {
+                        if flat.len() != 8 {
+                            continue;
+                        }
+                        let q: crate::detect::Quad = [
+                            Point2f::new(flat[0] as f32, flat[1] as f32),
+                            Point2f::new(flat[2] as f32, flat[3] as f32),
+                            Point2f::new(flat[4] as f32, flat[5] as f32),
+                            Point2f::new(flat[6] as f32, flat[7] as f32),
+                        ];
+                        if *idx < vis_quads.len() {
+                            vis_quads[*idx] = q;
+                            vis_manual[*idx] = true;
+                        } else {
+                            vis_quads.push(q);
+                            vis_manual.push(true);
+                        }
+                    }
+                    let sheet_jpg = pipeline::sheet_preview(&page, &vis_quads, &vis_manual)?;
                     let sheet_b64 =
                         base64::engine::general_purpose::STANDARD.encode(&sheet_jpg);
                     let stem = stem_of(&path);
@@ -218,15 +246,20 @@ fn run_loop(rx: Receiver<Msg>) {
                         bail!("cancelled");
                     }
                     std::fs::create_dir_all(paths::jobs_dir())?;
+                    let stages =
+                        (upscale as usize + colorize as usize + faces as usize).max(1);
+                    // Honest staging: the first model load takes ~1s, so say so
+                    // instead of going silent until the first inference event.
+                    progress(0, stages, "loading AI models…");
                     let e = enh.get_or_insert_with(|| {
                         Enhancers::load().expect("failed to load enhancers")
                     });
                     let img = enhance::load_mat(&path)?;
                     let mut stage = 0usize;
-                    let stages = upscale as usize + colorize as usize + faces as usize;
                     let mut mat = img;
 
                     if upscale {
+                        progress(stage, stages, "starting upscale…");
                         let mut last = 0f32;
                         mat = e.upscale(
                             &mat,
@@ -289,10 +322,12 @@ fn stem_of(p: &Path) -> String {
 }
 
 /// Run detection for one scan file; blocks until the service answers.
-pub fn detect_file(path: PathBuf) -> Result<SheetDetected> {
+/// `manual` lists user-adjusted crops (photo index, page-space quad) whose
+/// boxes must survive the fresh detection in the returned preview.
+pub fn detect_file(path: PathBuf, manual: Vec<(usize, Vec<f64>)>) -> Result<SheetDetected> {
     let (tx, rx) = channel();
     service()
-        .send(Msg::Detect { path, reply: tx })
+        .send(Msg::Detect { path, manual, reply: tx })
         .map_err(|_| anyhow::anyhow!("ml-service channel closed"))?;
     rx.recv()?
 }

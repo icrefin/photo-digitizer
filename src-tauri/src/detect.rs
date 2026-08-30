@@ -607,7 +607,9 @@ pub fn extract_photo(page: &Mat, quad: &Quad) -> Result<Mat> {
 }
 
 /// Downscaled page with detected quads drawn on top (for the CLI debug output).
-pub fn draw_debug(page: &Mat, quads: &[Quad]) -> Result<Mat> {
+/// `manual[i] == true` marks quad i as user-adjusted: always green, thicker,
+/// labeled "manual" so they stay visible no matter what auto-detection finds.
+pub fn draw_debug(page: &Mat, quads: &[Quad], manual: &[bool]) -> Result<Mat> {
     let scale = (900.0 / page.cols().max(page.rows()) as f64).min(1.0);
     let mut vis = Mat::default();
     imgproc::resize(
@@ -634,13 +636,19 @@ pub fn draw_debug(page: &Mat, quads: &[Quad]) -> Result<Mat> {
             outer.push(vp);
             outer
         };
-        let color = if i % 2 == 0 {
+        let is_manual = manual.get(i).copied().unwrap_or(false);
+        let color = if is_manual || i % 2 == 0 {
             Scalar::new(0.0, 220.0, 0.0, 255.0)
         } else {
             Scalar::new(0.0, 120.0, 255.0, 255.0)
         };
-        imgproc::polylines(&mut vis, &pts, true, color, 3, imgproc::LINE_8, 0)?;
-        let label = format!("#{i}");
+        let thickness = if is_manual { 5 } else { 3 };
+        imgproc::polylines(&mut vis, &pts, true, color, thickness, imgproc::LINE_8, 0)?;
+        let label = if is_manual {
+            format!("#{i} manual")
+        } else {
+            format!("#{i}")
+        };
         imgproc::put_text(
             &mut vis,
             &label,

@@ -50,8 +50,9 @@ pub fn process_scan(path: &Path, det: &mut Detectors) -> Result<Vec<ExtractedPho
 }
 
 /// Downscaled sheet with detected quads drawn on top, as JPEG bytes.
-pub fn sheet_preview(page: &Mat, quads: &[Quad]) -> Result<Vec<u8>> {
-    let vis = draw_debug(page, quads)?;
+/// `manual[i] == true` draws quad i as a user-adjusted (manual) crop.
+pub fn sheet_preview(page: &Mat, quads: &[Quad], manual: &[bool]) -> Result<Vec<u8>> {
+    let vis = draw_debug(page, quads, manual)?;
     detect::encode_jpeg(&vis, 1000, 85)
 }
 
@@ -62,7 +63,7 @@ pub fn save_debug(path: &Path, out_dir: &Path) -> Result<Option<std::path::PathB
     if quads.is_empty() {
         return Ok(None);
     }
-    let vis = draw_debug(&page, &quads)?;
+    let vis = draw_debug(&page, &quads, &[])?;
     let out = out_dir.join(format!(
         "{}_debug.png",
         path.file_stem().and_then(|s| s.to_str()).unwrap_or("scan")

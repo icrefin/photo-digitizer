@@ -10,7 +10,7 @@ pub mod service;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    paths::clean_jobs();
+    paths::clean_jobs(&[]);
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(cmds::AppState::default())
@@ -23,6 +23,7 @@ pub fn run() {
             cmds::re_extract_photo,
             cmds::sheet_preview_with_quads,
             cmds::enhance_photos,
+            cmds::reset_enhancement,
             cmds::save_photos,
             cmds::cancel_enhance,
             cmds::pick_folder,
