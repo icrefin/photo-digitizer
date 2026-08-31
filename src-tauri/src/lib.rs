@@ -9,10 +9,17 @@ pub mod phantom;
 pub mod pipeline;
 pub mod service;
 
-/// Build timestamp (unix seconds), stamped by build.rs at compile time.
-/// Used as the app's version string.
+/// Build timestamp (unix seconds) used as the app's version string.
+/// The executable's mtime is the honest build time and survives copies;
+/// the build.rs stamp is a fallback for exotic layouts.
 pub fn build_ts() -> u64 {
-    env!("PHOTO_DIGITIZER_BUILD_TS").parse().unwrap_or(0)
+    std::env::current_exe()
+        .and_then(|p| p.metadata())
+        .ok()
+        .and_then(|m| m.modified().ok())
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs())
+        .unwrap_or_else(|| env!("PHOTO_DIGITIZER_BUILD_TS").parse().unwrap_or(0))
 }
 
 /// App menu. Mirrors tauri's default macOS menu but replaces the native
