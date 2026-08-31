@@ -4,5 +4,12 @@ src-tauri/models/
 _pipeline_out/
 .DS_Store
 
+# Phantom upscale sidecar: venv + ~6 GB of models are downloaded, never
+# committed (see sidecar/phantom/README.md)
+sidecar/phantom/.venv/
+sidecar/phantom/models/
+__pycache__/
+*.pyc
+
 # Playwright test artifacts
 .playwright-mcp/

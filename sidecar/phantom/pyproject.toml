@@ -1,0 +1,22 @@
+[project]
+name = "phantom-upscale"
+version = "0.1.0"
+description = "Phantom (PASD) upscaling sidecar for photo-digitizer"
+requires-python = ">=3.10,<3.12"
+dependencies = [
+    "torch==2.5.1",
+    "torchvision==0.20.1",
+    "diffusers==0.21.4",
+    "transformers==4.33.3",
+    "accelerate==0.27.2",
+    "huggingface-hub==0.24.7",
+    "safetensors>=0.4,<0.5",
+    "numpy>=1.26,<2",
+    "pillow>=10.0",
+    "einops>=0.7",
+    "tqdm>=4.66",
+    "opencv-python-headless>=4.8",
+]
+
+[tool.uv]
+package = false

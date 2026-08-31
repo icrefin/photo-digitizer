@@ -183,6 +183,10 @@ main { flex: 1; display: grid; grid-template-columns: 230px 1fr 250px; min-heigh
 .check span { display: flex; flex-direction: column; line-height: 1.25; }
 .check small { color: var(--muted); }
 .check:has(input:checked) { outline: 1px solid var(--accent); }
+.engine-row { display: flex; flex-direction: column; gap: 6px; padding: 0 4px 8px 12px; }
+.engine-row .radio { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+.engine-row .radio input { accent-color: var(--accent); width: 14px; height: 14px; }
+#engineNote { margin-top: 2px; color: var(--muted); }
 #btnEnhance { margin-top: 6px; }
 .enh-status { margin-top: 8px; min-height: 30px; line-height: 1.5; }
 .save-row select {
@@ -229,4 +233,25 @@ main { flex: 1; display: grid; grid-template-columns: 230px 1fr 250px; min-heigh
   background: var(--bg3); border: 1px solid var(--line); padding: 10px 18px;
   border-radius: 10px; z-index: 99; max-width: 70vw; box-shadow: 0 8px 30px rgba(0,0,0,.5);
 }
+#appFooter {
+  display: flex; align-items: center; justify-content: flex-end; gap: 12px;
+  padding: 7px 14px; border-top: 1px solid var(--line);
+  background: var(--bg2); color: var(--muted); font-size: 12px;
+}
+#btnAbout { font-size: 12px; padding: 3px 12px; }
+#aboutDlg {
+  border: 1px solid var(--line); border-radius: 12px;
+  background: var(--bg2); color: var(--text);
+  padding: 24px 28px; min-width: 340px;
+  box-shadow: 0 18px 60px rgba(0,0,0,.45);
+}
+#aboutDlg::backdrop { background: rgba(0,0,0,.38); }
+.about-card h2 { margin: 0 0 4px; font-size: 18px; }
+.about-copy { margin: 0 0 16px; }
+.about-row {
+  display: flex; justify-content: space-between; gap: 24px;
+  padding: 7px 0; border-top: 1px solid var(--line); font-size: 13px;
+}
+.about-row span { color: var(--muted); }
+.about-actions { margin-top: 18px; text-align: right; }
 .hidden { display: none !important; }

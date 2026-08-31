@@ -416,7 +416,9 @@ pub async fn enhance_photos(
     upscale: bool,
     colorize: bool,
     faces: bool,
+    engine: Option<String>,
 ) -> Result<(Vec<PhotoMeta>, bool), String> {
+    let phantom = engine.as_deref() == Some("phantom");
     service::reset_cancel();
     let total = ids.len();
     let mut results = Vec::new();
@@ -439,7 +441,7 @@ pub async fn enhance_photos(
         });
         let id3 = id.clone();
         let enhanced = tauri::async_runtime::spawn_blocking(move || {
-            service::enhance_photo(id3, extracted, upscale, colorize, faces, progress)
+            service::enhance_photo(id3, extracted, upscale, colorize, faces, phantom, progress)
         })
         .await
         .map_err(e2s)?;
@@ -476,6 +478,37 @@ pub async fn enhance_photos(
 pub async fn cancel_enhance() -> Result<(), String> {
     service::cancel_enhance();
     Ok(())
+}
+
+/// Phantom (PASD) sidecar availability: sidecar installed, venv present,
+/// models downloaded. Cheap filesystem probe, no process spawn.
+#[tauri::command]
+pub async fn phantom_status() -> Result<crate::phantom::StatusOut, String> {
+    let s = crate::phantom::probe();
+    Ok(crate::phantom::StatusOut {
+        available: s.available,
+        models_ready: s.models_ready,
+        detail: s.detail,
+    })
+}
+
+#[derive(Serialize)]
+pub struct AboutInfo {
+    name: String,
+    /// Build timestamp in unix seconds — the app's "version".
+    build_ts: u64,
+    platform: String,
+    arch: String,
+}
+
+#[tauri::command]
+pub async fn about_info() -> Result<AboutInfo, String> {
+    Ok(AboutInfo {
+        name: "Photo Digitizer".into(),
+        build_ts: crate::build_ts(),
+        platform: std::env::consts::OS.into(),
+        arch: std::env::consts::ARCH.into(),
+    })
 }
 
 /// Discard a photo's enhancement result, restoring it to the original

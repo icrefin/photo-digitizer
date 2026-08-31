@@ -15,7 +15,6 @@
     <div class="folder-box">
       <input id="scanDir" type="text" spellcheck="false" data-i18n-ph="folderPh" placeholder="Folder containing scanned sheets…" />
       <button id="btnBrowse" class="ghost" data-i18n="browse">Browse…</button>
-      <button id="btnLoad" class="primary" data-i18n="load">Load</button>
     </div>
     <select id="langSel" title="Language">
       <option value="en">English</option>
@@ -90,6 +89,17 @@
         <input type="checkbox" id="optUpscale" checked />
         <span data-i18n="optUpscale">AI upscale</span> <small><span data-i18n="optUpscaleSub">Real-ESRGAN ×4</span></small>
       </label>
+      <div id="engineRow" class="engine-row muted small hidden">
+        <label class="radio">
+          <input type="radio" name="engine" value="esrgan" checked />
+          <span data-i18n="optEngineFast">Standard (Real-ESRGAN, seconds)</span>
+        </label>
+        <label class="radio">
+          <input type="radio" name="engine" value="phantom" />
+          <span data-i18n="optEnginePhantom">Phantom AI (diffusion, minutes)</span>
+        </label>
+        <div id="engineNote" class="muted small"></div>
+      </div>
       <label class="check">
         <input type="checkbox" id="optColorize" checked />
         <span data-i18n="optColorize">AI color</span> <small><span data-i18n="optColorizeSub">colorization / restore</span></small>
@@ -114,6 +124,11 @@
       <div class="panel-tip muted small" data-i18n="tip">Click a photo to compare original ↔ enhanced. Scroll to zoom each pane, drag to pan, double-click to reset. Use ⟲/⟳ to fix rotation and ✎ to adjust the crop by dragging its corners on the sheet — a manually cropped photo keeps its crop when sheets are re-detected, and can be reset to its original from the compare window. If two photos were detected as one, right-click the sheet and drag over one of them to extract it as a separate photo.</div>
     </aside>
   </main>
+
+  <footer id="appFooter">
+    <span id="appVerLabel">Photo Digitizer</span>
+    <button id="btnAbout" class="ghost" data-i18n="aboutBtn">About</button>
+  </footer>
 
   <!-- Compare modal: fixed two columns, wheel zoom -->
   <div id="modal" class="modal hidden">
@@ -141,6 +156,20 @@
   </div>
 
   <div id="toast" class="toast hidden"></div>
+
+  <!-- About dialog -->
+  <dialog id="aboutDlg">
+    <div class="about-card">
+      <h2 id="aboutName">Photo Digitizer</h2>
+      <p class="muted small about-copy">Digitize scanned photo sheets: split into photos, fix orientation, enhance and save.</p>
+      <div class="about-row"><span data-i18n="aboutVersion">Version</span><b id="aboutVersion"></b></div>
+      <div class="about-row"><span data-i18n="aboutBuilt">Built</span><b id="aboutBuilt"></b></div>
+      <div class="about-row"><span data-i18n="aboutPlatform">Platform</span><b id="aboutPlatform"></b></div>
+      <div class="about-actions">
+        <button id="aboutClose" class="primary" data-i18n="aboutClose">OK</button>
+      </div>
+    </div>
+  </dialog>
 
   <script src="app.js"></script>
 </body>

@@ -4,6 +4,7 @@
 use crate::enhance::{self, Enhancers};
 use crate::orient::Detectors;
 use crate::paths;
+use crate::phantom::Worker;
 use crate::pipeline;
 use anyhow::{bail, Result};
 use base64::Engine;
@@ -89,6 +90,7 @@ enum Msg {
         upscale: bool,
         colorize: bool,
         faces: bool,
+        phantom: bool,
         progress: ProgressCb,
         reply: Sender<Result<EnhancedPhoto>>,
     },
@@ -109,6 +111,7 @@ fn service() -> &'static Sender<Msg> {
 fn run_loop(rx: Receiver<Msg>) {
     let mut det: Option<Detectors> = None;
     let mut enh: Option<Enhancers> = None;
+    let mut phantom_worker: Option<Worker> = None;
     while let Ok(msg) = rx.recv() {
         match msg {
             Msg::Detect { path, manual, reply } => {
@@ -240,7 +243,7 @@ fn run_loop(rx: Receiver<Msg>) {
                 })();
                 let _ = reply.send(r);
             }
-            Msg::Enhance { id, path, upscale, colorize, faces, mut progress, reply } => {
+            Msg::Enhance { id, path, upscale, colorize, faces, phantom, mut progress, reply } => {
                 let r = (|| -> Result<EnhancedPhoto> {
                     if is_cancelled() {
                         bail!("cancelled");
@@ -251,26 +254,58 @@ fn run_loop(rx: Receiver<Msg>) {
                     // Honest staging: the first model load takes ~1s, so say so
                     // instead of going silent until the first inference event.
                     progress(0, stages, "loading AI models…");
-                    let e = enh.get_or_insert_with(|| {
-                        Enhancers::load().expect("failed to load enhancers")
-                    });
                     let img = enhance::load_mat(&path)?;
                     let mut stage = 0usize;
                     let mut mat = img;
+                    let stem = stem_of(&path);
 
                     if upscale {
                         progress(stage, stages, "starting upscale…");
-                        let mut last = 0f32;
-                        mat = e.upscale(
-                            &mat,
-                            &mut |f| {
-                                if (f * 20.0) as usize > (last * 20.0) as usize || f >= 1.0 {
-                                    last = f;
-                                    progress(stage, stages, &format!("upscaling {f:.0}%"));
-                                }
-                            },
-                            &|| is_cancelled(),
-                        )?;
+                        if phantom {
+                            // Phantom PASD sidecar: diffusion-based ×4. It
+                            // writes PNG directly; the mat below is for the
+                            // following enhancement stages.
+                            if phantom_worker.is_none() {
+                                phantom_worker = Some(Worker::spawn()?);
+                            }
+                            let in_path = paths::jobs_dir().join(format!("{stem}_phantom_in.png"));
+                            let out_path = paths::jobs_dir().join(format!("{stem}_phantom_out.png"));
+                            enhance::save_mat(&mat, &in_path, 95)?;
+                            phantom_worker.as_mut().unwrap().upscale(
+                                &in_path,
+                                &out_path,
+                                4,
+                                "",
+                                &mut |pct, msg| {
+                                    progress(
+                                        stage,
+                                        stages,
+                                        &format!("Phantom {} {:.0}%", msg.trim(), pct * 100.0),
+                                    );
+                                },
+                                &|| is_cancelled(),
+                            )?;
+                            mat = enhance::load_mat(&out_path)?;
+                        } else {
+                            let mut last = 0f32;
+                            mat = {
+                                let e = enh.get_or_insert_with(|| {
+                                    Enhancers::load().expect("failed to load enhancers")
+                                });
+                                e.upscale(
+                                    &mat,
+                                    &mut |f| {
+                                        if (f * 20.0) as usize > (last * 20.0) as usize
+                                            || f >= 1.0
+                                        {
+                                            last = f;
+                                            progress(stage, stages, &format!("upscaling {f:.0}%"));
+                                        }
+                                    },
+                                    &|| is_cancelled(),
+                                )?
+                            };
+                        }
                         stage += 1;
                     }
                     if colorize {
@@ -278,7 +313,12 @@ fn run_loop(rx: Receiver<Msg>) {
                             bail!("cancelled");
                         }
                         progress(stage, stages, "colorizing…");
-                        mat = e.colorize(&mat)?;
+                        mat = {
+                            let e = enh.get_or_insert_with(|| {
+                                Enhancers::load().expect("failed to load enhancers")
+                            });
+                            e.colorize(&mat)?
+                        };
                     }
                     if faces {
                         if is_cancelled() {
@@ -286,19 +326,23 @@ fn run_loop(rx: Receiver<Msg>) {
                         }
                         progress(stage, stages, "restoring faces…");
                         let mut last = 0usize;
-                        mat = enhance::restore_faces(e, &mat, &mut |done, total| {
-                            if done > last || done == total {
-                                last = done;
-                                progress(
-                                    stage,
-                                    stages,
-                                    &format!("restoring faces {done}/{total}"),
-                                );
-                            }
-                        }, &|| is_cancelled())?;
+                        mat = {
+                            let e = enh.get_or_insert_with(|| {
+                                Enhancers::load().expect("failed to load enhancers")
+                            });
+                            enhance::restore_faces(e, &mat, &mut |done, total| {
+                                if done > last || done == total {
+                                    last = done;
+                                    progress(
+                                        stage,
+                                        stages,
+                                        &format!("restoring faces {done}/{total}"),
+                                    );
+                                }
+                            }, &|| is_cancelled())?
+                        };
                     }
 
-                    let stem = stem_of(&path);
                     let out = paths::jobs_dir().join(format!("{stem}_enh.png"));
                     enhance::save_mat(&mat, &out, 95)?;
                     let jpg = crate::detect::encode_jpeg(&mat, 900, 90)?;
@@ -355,11 +399,12 @@ pub fn enhance_photo(
     upscale: bool,
     colorize: bool,
     faces: bool,
+    phantom: bool,
     progress: ProgressCb,
 ) -> Result<EnhancedPhoto> {
     let (tx, rx) = channel();
     service()
-        .send(Msg::Enhance { id, path, upscale, colorize, faces, progress, reply: tx })
+        .send(Msg::Enhance { id, path, upscale, colorize, faces, phantom, progress, reply: tx })
         .map_err(|_| anyhow::anyhow!("ml-service channel closed"))?;
     rx.recv()?
 }

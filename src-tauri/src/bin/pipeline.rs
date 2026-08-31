@@ -70,6 +70,28 @@ fn main() -> Result<()> {
             for p in expand(&paths)? {
                 let img = photo_digitizer_lib::enhance::load_mat(&p)?;
                 let stem = p.file_stem().and_then(|s| s.to_str()).unwrap_or("photo");
+                if flags.contains("--phantom") {
+                    let t0 = Instant::now();
+                    let in_png = out_dir.join(format!("{stem}_phantom_in.png"));
+                    let out_png = out_dir.join(format!("{stem}_phantom_out.png"));
+                    photo_digitizer_lib::enhance::save_mat(&img, &in_png, 95)?;
+                    let mut worker = photo_digitizer_lib::phantom::Worker::spawn()?;
+                    worker.upscale(
+                        &in_png,
+                        &out_png,
+                        4,
+                        "cli",
+                        &mut |pct, msg| {
+                            print!("\rphantom {pct:>5.0}% ({msg})", pct = pct * 100.0);
+                            use std::io::Write as _;
+                            std::io::stdout().flush().ok();
+                        },
+                        &|| false,
+                    )?;
+                    let out = photo_digitizer_lib::enhance::load_mat(&out_png)?;
+                    println!("\rphantom done in {:.1}s -> {} ({}x{})",
+                             t0.elapsed().as_secs_f64(), out_png.display(), out.cols(), out.rows());
+                }
                 if flags.contains("--upscale") {
                     let t0 = Instant::now();
                     let up = enh.upscale(

@@ -5,6 +5,10 @@ const { listen } = window.__TAURI__.event;
 
 const $ = (id) => document.getElementById(id);
 
+function selectedRadio(name) {
+  return document.querySelector(`input[name="${name}"]:checked`)?.value;
+}
+
 const state = {
   dir: null,
   files: [],
@@ -26,7 +30,8 @@ let lang = localStorage.getItem("lang")
 const I18N = {
   en: {
     folderPh: "Folder containing scanned sheets…",
-    browse: "Browse…", load: "Load",
+    browse: "Browse…",
+    loadEmpty: "Choose a folder first", loadFailed: "Load failed: {0}",
     scanSheets: "Scan sheets",
     selectAll: "Select all", detectAll: "Detect all sheets",
     cancel: "✕ Cancel",
@@ -38,6 +43,9 @@ const I18N = {
     enhance: "Enhance",
     panelDesc: "Runs locally — Real-ESRGAN ×4 for resolution, Zhang colorization for faded color.",
     optUpscale: "AI upscale", optUpscaleSub: "Real-ESRGAN ×4",
+    optEngineFast: "Standard (Real-ESRGAN, seconds)",
+    optEnginePhantom: "Phantom AI (diffusion, minutes)",
+    optEngineUnavailable: "Phantom AI not installed — see sidecar/phantom/README.md",
     optColorize: "AI color", optColorizeSub: "colorization / restore",
     optFaces: "AI faces", optFacesSub: "GFPGAN v1.4 restoration",
     enhanceSelected: "Enhance selected",
@@ -79,6 +87,10 @@ const I18N = {
     pickFailed: "Folder picker failed: {0}",
     resetDone: "Reset to original — you can enhance again anytime",
     resetFailed: "Reset failed: {0}",
+    aboutBtn: "About",
+    aboutVersion: "Version", aboutBuilt: "Built",
+    aboutPlatform: "Platform", aboutClose: "OK",
+    aboutFailed: "About failed: {0}",
     modalInfo: "original {0}  →  enhanced {1}",
     modalInfoNoEnh: "{0} · run Enhance to see AI output here",
     stageLoad: "loading AI models…",
@@ -86,6 +98,7 @@ const I18N = {
     stageUpscale: "upscaling {0}",
     stageColorize: "colorizing…",
     stageFaces: "restoring faces {0}",
+    stagePhantom: "Phantom AI {0}",
     stageDone: "done",
     mFace: "face", mObject: "object", mNone: "none", mManual: "manual",
     rotCcw: "Rotate 90° counter-clockwise",
@@ -96,7 +109,8 @@ const I18N = {
   },
   zh: {
     folderPh: "包含扫描页的文件夹…",
-    browse: "浏览…", load: "加载",
+    browse: "浏览…",
+    loadEmpty: "请先选择文件夹", loadFailed: "加载失败：{0}",
     scanSheets: "扫描页",
     selectAll: "全选", detectAll: "检测全部页",
     cancel: "✕ 取消",
@@ -108,6 +122,9 @@ const I18N = {
     enhance: "增强",
     panelDesc: "本地运行 — Real-ESRGAN ×4 提升分辨率，Zhang 方法为褪色照片修复色彩。",
     optUpscale: "AI 放大", optUpscaleSub: "Real-ESRGAN ×4",
+    optEngineFast: "标准（Real-ESRGAN，秒级）",
+    optEnginePhantom: "Phantom AI（扩散模型，分钟级）",
+    optEngineUnavailable: "Phantom AI 未安装 — 见 sidecar/phantom/README.md",
     optColorize: "AI 上色", optColorizeSub: "上色 / 修复",
     optFaces: "AI 人脸", optFacesSub: "GFPGAN v1.4 修复",
     enhanceSelected: "增强选中项",
@@ -149,6 +166,10 @@ const I18N = {
     pickFailed: "选择文件夹失败：{0}",
     resetDone: "已恢复原图 — 可随时再次增强",
     resetFailed: "恢复失败：{0}",
+    aboutBtn: "关于",
+    aboutVersion: "版本", aboutBuilt: "构建时间",
+    aboutPlatform: "平台", aboutClose: "好的",
+    aboutFailed: "关于信息获取失败：{0}",
     modalInfo: "原图 {0}  →  增强后 {1}",
     modalInfoNoEnh: "{0} · 运行增强后可在此查看 AI 输出",
     stageLoad: "正在加载 AI 模型…",
@@ -156,6 +177,7 @@ const I18N = {
     stageUpscale: "放大中 {0}",
     stageColorize: "上色中…",
     stageFaces: "修复人脸 {0}",
+    stagePhantom: "Phantom AI {0}",
     stageDone: "完成",
     mFace: "人脸", mObject: "物体", mNone: "无", mManual: "手动",
     rotCcw: "逆时针旋转 90°",
@@ -179,6 +201,7 @@ function tStage(stage) {
   if (stage.startsWith("upscaling")) return t("stageUpscale", stage.replace(/^upscaling\s*/, "").trim());
   if (stage.startsWith("colorizing")) return t("stageColorize");
   if (stage.startsWith("restoring faces")) return t("stageFaces", stage.replace(/^restoring faces\s*/, "").trim());
+  if (stage.startsWith("Phantom")) return t("stagePhantom", stage.replace(/^Phantom\s*/, "").trim());
   if (stage === "done") return t("stageDone");
   return stage;
 }
@@ -467,6 +490,76 @@ async function rotate(id, deg) {
   }
 }
 
+/* ---------- enhance engine (Phantom sidecar) ---------- */
+
+async function initPhantomEngine() {
+  const row = $("engineRow");
+  const phantomRadio = document.querySelector('input[name="engine"][value="phantom"]');
+  const fastRadio = document.querySelector('input[name="engine"][value="esrgan"]');
+  const saved = localStorage.getItem("engine");
+  if (saved === "phantom" && phantomRadio) {
+    phantomRadio.checked = true;
+    if (fastRadio) fastRadio.checked = false;
+  }
+  let available = false;
+  try {
+    const status = await invoke("phantom_status");
+    available = !!status.available;
+    if (!available) $("engineNote").textContent = t("optEngineUnavailable");
+  } catch (_) { /* keep hidden */ }
+  if (!available || !phantomRadio) {
+    if (phantomRadio) phantomRadio.disabled = true;
+    if (localStorage.getItem("engine") === "phantom") localStorage.setItem("engine", "esrgan");
+    row.classList.add("hidden");
+    return;
+  }
+  // Show the engine row only when upscaling is on.
+  const syncRow = () => row.classList.toggle("hidden", !$("optUpscale").checked);
+  $("optUpscale").addEventListener("change", syncRow);
+  syncRow();
+  document.querySelectorAll('input[name="engine"]').forEach((r) => {
+    r.addEventListener("change", () => localStorage.setItem("engine", r.value));
+  });
+}
+
+/* ---------- about & version ---------- */
+
+let aboutInfo = null;
+
+function fmtTs(ts) {
+  return new Date(ts * 1000).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+}
+
+async function openAbout() {
+  if (!aboutInfo) {
+    try {
+      aboutInfo = await invoke("about_info");
+    } catch (e) {
+      toast(t("aboutFailed", e));
+      return;
+    }
+  }
+  $("aboutDlg").showModal();
+}
+
+async function initAbout() {
+  try {
+    aboutInfo = await invoke("about_info");
+  } catch (_) { /* footer keeps bare name */ }
+  if (aboutInfo) {
+    $("appVerLabel").textContent = `${aboutInfo.name} · ${fmtTs(aboutInfo.build_ts)}`;
+    $("aboutVersion").textContent = fmtTs(aboutInfo.build_ts);
+    $("aboutBuilt").textContent = fmtTs(aboutInfo.build_ts);
+    $("aboutPlatform").textContent = `${aboutInfo.platform} / ${aboutInfo.arch}`;
+  }
+  $("btnAbout").onclick = openAbout;
+  $("aboutClose").onclick = () => $("aboutDlg").close();
+  // Menu bar → Photo Digitizer → About Photo Digitizer opens the same dialog.
+  try {
+    await listen("show-about", openAbout);
+  } catch (_) { /* not a Tauri context (tests) */ }
+}
+
 /* ---------- enhance ---------- */
 
 async function enhance() {
@@ -476,6 +569,7 @@ async function enhance() {
   const upscale = $("optUpscale").checked;
   const colorize = $("optColorize").checked;
   const faces = $("optFaces").checked;
+  const engine = selectedRadio("engine") || "esrgan";
   if (!upscale && !colorize && !faces) return toast(t("noEnhOpt"));
   $("btnEnhance").disabled = true;
   showCancel(true);
@@ -491,7 +585,7 @@ async function enhance() {
       state.photos.set(ev.payload.id, ev.payload.meta);
       renderGrid();
     });
-    const [, cancelled] = await invoke("enhance_photos", { ids, upscale, colorize, faces });
+    const [, cancelled] = await invoke("enhance_photos", { ids, upscale, colorize, faces, engine });
     unlisten();
     unlisten2();
     setProgress(null);
@@ -1006,15 +1100,17 @@ window.addEventListener("DOMContentLoaded", async () => {
       await loadFolder(dir);
     }
   };
-  $("btnLoad").onclick = async () => {
-    const dir = $("scanDir").value.trim();
-    if (!dir) return toast("Choose a folder first");
+  // Typed/pasted paths load on Enter (the Load button was removed).
+  $("scanDir").addEventListener("keydown", async (e) => {
+    if (e.key !== "Enter" || e.isComposing) return;
+    const dir = e.target.value.trim();
+    if (!dir) return toast(t("loadEmpty"));
     try {
       await loadFolder(dir);
-    } catch (e) {
-      toast(`Load failed: ${e}`);
+    } catch (err) {
+      toast(t("loadFailed", err));
     }
-  };
+  });
   $("btnDetectAll").onclick = detectAll;
   $("btnSelectAll").onclick = () => {
     const list = photosInView();
@@ -1045,6 +1141,8 @@ window.addEventListener("DOMContentLoaded", async () => {
   setupPane("before");
   setupPane("after");
   applyLang();
+  await initPhantomEngine();
+  await initAbout();
 
   try {
     const def = await invoke("default_dir");
