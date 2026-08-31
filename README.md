@@ -1,8 +1,5 @@
 # Photo Digitizer
 
-A Tauri desktop app that digitizes folders of scanned photo prints — entirely
-locally, no cloud, no uploads.
-
 > 一款将扫描的老照片文件夹数字化的桌面应用 — 完全本地运行，不上传、不联网。
 
 ---
@@ -15,24 +12,24 @@ The app turns a folder of scanner sheets into individual, straightened,
 enhanced photos:
 
 1. **Split** — automatically detects and extracts every individual photo from a
-   scanner sheet (any count, any tilt, perspective-corrected). If two photos
+  scanner sheet (any count, any tilt, perspective-corrected). If two photos
    were wrongly detected as one, you can separate them by hand.
 2. **Straighten** — detects the correct upright orientation of each photo using
-   on-device AI: YuNet face detection first, MobileNet-SSD object detection as
+  on-device AI: YuNet face detection first, MobileNet-SSD object detection as
    a fallback. A tiny manual ⟲/⟳ control is available per photo.
 3. **Enhance (optional, per photo)**:
-   - *AI upscale*: **Real-ESRGAN ×4** (RRDBNet) via ONNX Runtime, tiled with
-     overlap blending — seconds per photo, bundled with the app.
-   - *AI upscale (best)*: **Phantom AI** — [dreamoving/Phantom](https://github.com/dreamoving/Phantom)'s
-     PASD diffusion super-resolution via an optional Python sidecar
-     ([sidecar/phantom](sidecar/phantom/README.md)). One-click setup, ~4 min
-     per photo on Apple Silicon, best results on badly degraded old photos.
-   - *AI color*: **Zhang et al. colorization** — faded prints are re-colored;
-     already-colorful prints keep most of their original chroma.
-   - *AI faces*: **GFPGAN v1.4** (ONNX) — faces are detected, aligned, restored
-     and feather-blended (~1 s per face on CPU).
+  - *AI upscale*: **Real-ESRGAN ×4** (RRDBNet) via ONNX Runtime, tiled with
+   overlap blending — seconds per photo, bundled with the app.
+  - *AI upscale (best)*: **Phantom AI** — [dreamoving/Phantom](https://github.com/dreamoving/Phantom)'s
+  PASD diffusion super-resolution via an optional Python sidecar
+  ([sidecar/phantom](sidecar/phantom/README.md)). One-click setup, ~4 min
+  per photo on Apple Silicon, best results on badly degraded old photos.
+  - *AI color*: **Zhang et al. colorization** — faded prints are re-colored;
+  already-colorful prints keep most of their original chroma.
+  - *AI faces*: **GFPGAN v1.4** (ONNX) — faces are detected, aligned, restored
+  and feather-blended (~1 s per face on CPU).
 4. **Confirm & save** — side-by-side slider comparison (original ↔ enhanced)
-   before anything touches disk. Saving goes to a folder you pick.
+  before anything touches disk. Saving goes to a folder you pick.
 
 Everything runs **locally**: models are bundled in the app, so the release
 build works offline after installation.
@@ -45,25 +42,27 @@ Real-ESRGAN ×4 is used.
 
 ### Features at a glance
 
-| Feature | Where |
-|---|---|
-| English / 中文 interface (persisted) | Header, top-right selector |
-| Detect one sheet / all sheets | Toolbar, or click a sheet in the sidebar |
-| Rotate 90° ⟲ / ⟳ | Photo card buttons |
-| Adjust crop (drag corners) | ✎ on the photo card |
-| **Manual split** — right-click the sheet, drag a box around one photo | Sheet view |
-| AI upscale / color / face restore | Enhance panel |
-| Phantom AI diffusion upscale (optional sidecar) | Enhance panel engine radio |
-| Compare original ↔ enhanced (scroll zoom, drag pan) | Click a photo |
-| Reset to original | Compare window |
-| About dialog — version shown as the build timestamp | Footer (🔗 About) |
-| Save as JPEG/PNG to any folder | Save panel |
+
+| Feature                                                               | Where                                    |
+| --------------------------------------------------------------------- | ---------------------------------------- |
+| English / 中文 interface (persisted)                                    | Header, top-right selector               |
+| Detect one sheet / all sheets                                         | Toolbar, or click a sheet in the sidebar |
+| Rotate 90° ⟲ / ⟳                                                      | Photo card buttons                       |
+| Adjust crop (drag corners)                                            | ✎ on the photo card                      |
+| **Manual split** — right-click the sheet, drag a box around one photo | Sheet view                               |
+| AI upscale / color / face restore                                     | Enhance panel                            |
+| Phantom AI diffusion upscale (optional sidecar)                       | Enhance panel engine radio               |
+| Compare original ↔ enhanced (scroll zoom, drag pan)                   | Click a photo                            |
+| Reset to original                                                     | Compare window                           |
+| About dialog — version shown as the build timestamp                   | Footer (🔗 About)                        |
+| Save as JPEG/PNG to any folder                                        | Save panel                               |
+
 
 ### Requirements
 
 - macOS on Apple Silicon (the release build is `arm64`)
 - For building from source: `brew install opencv@4 onnxruntime`, Node.js, a
-  Rust toolchain
+Rust toolchain
 
 ### Build from source
 
@@ -80,11 +79,13 @@ npm run build    # release: binary + .app + .dmg
 
 Release artifacts:
 
-| Artifact | Path |
-|---|---|
-| App binary | `src-tauri/target/release/photo-digitizer` |
-| macOS app | `src-tauri/target/release/bundle/macos/Photo Digitizer.app` |
+
+| Artifact      | Path                                                                    |
+| ------------- | ----------------------------------------------------------------------- |
+| App binary    | `src-tauri/target/release/photo-digitizer`                              |
+| macOS app     | `src-tauri/target/release/bundle/macos/Photo Digitizer.app`             |
 | DMG installer | `src-tauri/target/release/bundle/dmg/Photo Digitizer_0.1.0_aarch64.dmg` |
+
 
 The DMG is ~500 MB because the AI models are bundled inside the app, so it
 works right after installation with no downloads.
@@ -92,13 +93,12 @@ works right after installation with no downloads.
 > **Signing note**: the bundle carries an ad-hoc signature only. It runs
 > normally on the machine that built it. If you distribute the DMG, Gatekeeper
 > will show "unidentified developer" on other Macs. On first launch either:
+>
 > - right-click the app → **Open** (once per app), or
 > - remove the quarantine flag with `xattr`:
->
 >   ```bash
 >   xattr -dr com.apple.quarantine "/Applications/Photo Digitizer.app"
 >   ```
->
 >   (`xattr` works on a Tauri app exactly like on any other .app bundle — it
 >   removes the quarantine attribute from the bundle and everything inside it;
 >   nothing Tauri-specific interferes.)
@@ -154,6 +154,36 @@ Files are written as `<stem>_p<index>.jpg/png`, e.g.
 `20260829095358_001_p0.jpg`. Saved photos are `-enh` enhanced versions when an
 enhancement exists, otherwise the original extraction.
 
+### Example
+
+A step-by-step walkthrough on the sample sheet in
+[`sample/`](./sample/) — load, detect, fix a merged photo, re-detect:
+
+**Step 1 — Load the folder and detect all sheets.** The left pane shows the
+original scan sheet with the detected photo quads drawn on it; the right pane
+lists the extracted photos, each already straightened and white-trimmed, with
+a badge for the orientation that was chosen (`face` / `270° face` / `90° face`).
+
+![Step 1: load and detect all sheets](./sample/step-1-detect.png)
+
+**Step 2 — Adjust a crop.** Click **✎** on a photo card to enter crop mode:
+the sheet shows that photo's quad with draggable corner handles, and a banner
+appears with **Apply crop** / **Cancel**.
+
+![Step 2: adjust the crop](./sample/step-2-crop.png)
+
+**Step 3 — Split a merged photo.** Applying your box over one of the photos
+that auto-detection merged extracts it as its own photo — it appears in the
+grid with a `new (manual)` badge and a solid green box on the sheet.
+
+![Step 3: split a merged photo](./sample/step-3-split.png)
+
+**Step 4 — Re-detect keeps manual crops.** Re-running detection keeps every
+manual crop: the sheet still draws them as solid green boxes and the
+extracted cards carry the **✎ crop** badge.
+
+![Step 4: manual crops survive re-detect](./sample/step-4-redetect.png)
+
 ### Project layout
 
 ```
@@ -193,33 +223,35 @@ with the detected quads drawn on the sheet.
 ### Notes & tuning
 
 - Detection scales each sheet to ≤1600 px for segmentation (Canny + Otsu
-  strategies merged, IoU-deduped); extraction warps the full-resolution sheet.
+strategies merged, IoU-deduped); extraction warps the full-resolution sheet.
 - Upscale inputs are capped at 640 px on the long side (256 px tiles, 32 px
-  overlap, linear blending) → output is ×4, e.g. 640×480 → 2560×1920. Raise
-  `MAX_UPSCALE_INPUT` in `enhance.rs` for higher quality at quadratic cost.
+overlap, linear blending) → output is ×4, e.g. 640×480 → 2560×1920. Raise
+`MAX_UPSCALE_INPUT` in `enhance.rs` for higher quality at quadratic cost.
 - Colorization runs at ≤512 px on the long side; predicted chroma is upsampled
-  and blended with the original chroma using a mean-saturation weight
-  (faded → mostly AI color, vivid → mostly original).
+and blended with the original chroma using a mean-saturation weight
+(faded → mostly AI color, vivid → mostly original).
 - Orientation: YuNet landmarks pose-check every detected face (eyes above
-  nose above mouth ⇒ ×3 weight), so misdetections on rotated variants can't
-  win. The object detector (SSD) fallback only decides when its total score
-  is ≥0.9 *and* 1.3× the runner-up; otherwise the photo keeps 0°.
+nose above mouth ⇒ ×3 weight), so misdetections on rotated variants can't
+win. The object detector (SSD) fallback only decides when its total score
+is ≥0.9 *and* 1.3× the runner-up; otherwise the photo keeps 0°.
 - Extraction: after the perspective warp, `trim_white_borders` crops
-  near-uniform white scan margins (≥98% bright rows/cols, capped at 30% per
-  side, min 120px kept).
+near-uniform white scan margins (≥98% bright rows/cols, capped at 30% per
+side, min 120px kept).
 - The `ml-service` worker thread owns all model handles (OpenCV `Net` is not
-  `Send`); the Tauri app talks to it over a channel, so heavy inference never
-  blocks the UI thread.
+`Send`); the Tauri app talks to it over a channel, so heavy inference never
+blocks the UI thread.
 
 ### Models
 
-| File | Purpose | Source |
-|------|---------|--------|
-| `yunet.onnx` | face detection for orientation | [opencv_zoo](https://github.com/opencv/opencv_zoo) |
-| `ssd_mobilenet.caffemodel` + `.prototxt` | object detection fallback for orientation | [chuanqi305/MobileNet-SSD](https://github.com/chuanqi305/MobileNet-SSD) |
-| `esrgan_x4.onnx` | ×4 super-resolution | [anakhiu/realesrgan-onnx](https://huggingface.co/anakhiu/realesrgan-onnx) (Real-ESRGAN x4plus) |
-| `colorizer.caffemodel` + `.prototxt` + `points_in_hull.npy` | colorization | [richzhang/colorization](https://github.com/richzhang/colorization) (release v2) |
-| `gfpgan_1.4.onnx` | face restoration | [facefusion/models-3.0.0](https://huggingface.co/facefusion/models-3.0.0) |
+
+| File                                                        | Purpose                                   | Source                                                                                         |
+| ----------------------------------------------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `yunet.onnx`                                                | face detection for orientation            | [opencv_zoo](https://github.com/opencv/opencv_zoo)                                             |
+| `ssd_mobilenet.caffemodel` + `.prototxt`                    | object detection fallback for orientation | [chuanqi305/MobileNet-SSD](https://github.com/chuanqi305/MobileNet-SSD)                        |
+| `esrgan_x4.onnx`                                            | ×4 super-resolution                       | [anakhiu/realesrgan-onnx](https://huggingface.co/anakhiu/realesrgan-onnx) (Real-ESRGAN x4plus) |
+| `colorizer.caffemodel` + `.prototxt` + `points_in_hull.npy` | colorization                              | [richzhang/colorization](https://github.com/richzhang/colorization) (release v2)               |
+| `gfpgan_1.4.onnx`                                           | face restoration                          | [facefusion/models-3.0.0](https://huggingface.co/facefusion/models-3.0.0)                      |
+
 
 ---
 
@@ -230,32 +262,34 @@ with the detected quads drawn on the sheet.
 将扫描的老照片文件夹变成一张张独立、摆正、可增强的照片：
 
 1. **拆分** — 自动检测并提取扫描页上的每一张照片（数量不限、倾斜任意、
-   自动透视校正）。若两张照片被误检测为一张，可以手动分离。
+  自动透视校正）。若两张照片被误检测为一张，可以手动分离。
 2. **摆正** — 使用设备端 AI 判断每张照片的正确朝向：优先 YuNet 人脸检测，
-   MobileNet-SSD 物体检测作为后备。每张照片另配有 ⟲/⟳ 手动旋转按钮。
+  MobileNet-SSD 物体检测作为后备。每张照片另配有 ⟲/⟳ 手动旋转按钮。
 3. **增强（可选，逐张）**：
-   - *AI 放大*：**Real-ESRGAN ×4**（RRDBNet，ONNX Runtime），分块重叠融合。
-   - *AI 上色*：**Zhang 等 上色模型** — 褪色照片重新上色；本就有色彩的照片
-     保留大部分原色彩。
-   - *AI 人脸*：**GFPGAN v1.4**（ONNX）— 自动检测、对齐、修复并羽化融合人脸
-     （CPU 每张约 1 秒）。
+  - *AI 放大*：**Real-ESRGAN ×4**（RRDBNet，ONNX Runtime），分块重叠融合。
+  - *AI 上色*：**Zhang 等 上色模型** — 褪色照片重新上色；本就有色彩的照片
+  保留大部分原色彩。
+  - *AI 人脸*：**GFPGAN v1.4**（ONNX）— 自动检测、对齐、修复并羽化融合人脸
+  （CPU 每张约 1 秒）。
 4. **确认与保存** — 保存前可左右并排对比（原图 ↔ 增强后）。保存到任意文件夹。
 
 全部功能**本地运行**：模型打包在应用内，安装后可离线使用。
 
 ### 功能一览
 
-| 功能 | 位置 |
-|---|---|
-| 英文 / 中文界面（记住选择） | 标题栏右上角选择器 |
-| 检测单页 / 检测全部页 | 工具栏，或点击左侧列表中的扫描页 |
-| 旋转 90° ⟲ / ⟳ | 照片卡片上的按钮 |
-| 调整裁剪（拖动角点） | 照片卡片上的 ✎ |
-| **手动拆分** — 右键扫描页，拖框圈选其中一张 | 扫描页视图 |
-| AI 放大 / 上色 / 人脸修复 | 右侧增强面板 |
-| 原图 ↔ 增强后对比（滚轮缩放、拖动平移） | 点击照片 |
-| 恢复原图 | 对比窗口 |
-| 保存为 JPEG/PNG 到任意文件夹 | 保存面板 |
+
+| 功能                        | 位置               |
+| ------------------------- | ---------------- |
+| 英文 / 中文界面（记住选择）           | 标题栏右上角选择器        |
+| 检测单页 / 检测全部页              | 工具栏，或点击左侧列表中的扫描页 |
+| 旋转 90° ⟲ / ⟳              | 照片卡片上的按钮         |
+| 调整裁剪（拖动角点）                | 照片卡片上的 ✎         |
+| **手动拆分** — 右键扫描页，拖框圈选其中一张 | 扫描页视图            |
+| AI 放大 / 上色 / 人脸修复         | 右侧增强面板           |
+| 原图 ↔ 增强后对比（滚轮缩放、拖动平移）     | 点击照片             |
+| 恢复原图                      | 对比窗口             |
+| 保存为 JPEG/PNG 到任意文件夹       | 保存面板             |
+
 
 ### 系统要求
 
@@ -277,11 +311,13 @@ npm run build    # 发布版：二进制 + .app + .dmg
 
 发布产物：
 
-| 产物 | 路径 |
-|---|---|
-| 主程序 | `src-tauri/target/release/photo-digitizer` |
-| macOS 应用 | `src-tauri/target/release/bundle/macos/Photo Digitizer.app` |
-| DMG 安装包 | `src-tauri/target/release/bundle/dmg/Photo Digitizer_0.1.0_aarch64.dmg` |
+
+| 产物       | 路径                                                                      |
+| -------- | ----------------------------------------------------------------------- |
+| 主程序      | `src-tauri/target/release/photo-digitizer`                              |
+| macOS 应用 | `src-tauri/target/release/bundle/macos/Photo Digitizer.app`             |
+| DMG 安装包  | `src-tauri/target/release/bundle/dmg/Photo Digitizer_0.1.0_aarch64.dmg` |
+
 
 DMG 约 500 MB：AI 模型已打包进应用，安装后立即使用，无需再下载。
 
@@ -326,6 +362,33 @@ DMG 约 500 MB：AI 模型已打包进应用，安装后立即使用，无需再
 例如 `20260829095358_001_p0.jpg`；已增强的照片保存增强版本，否则保存原始
 提取结果。
 
+### 示例
+
+在 [`sample/`](./sample/) 中的示例扫描页上完整演示一遍：加载 → 检测 →
+拆分误检照片 → 重新检测。
+
+**1. 加载文件夹并检测全部页。** 左窗格显示原始扫描页与检测出的照片四边形；
+右窗格列出已摆正、修边的照片，每张带所选朝向的徽标（`face` / `270° face` /
+`90° face`）。
+
+![第 1 步：加载并检测全部页](./sample/step-1-detect.png)
+
+**2. 调整裁剪。** 点击照片卡片上的 **✎** 进入裁剪模式：扫描页显示该照片的
+四边形与可拖动的角点手柄，顶部出现 **应用裁剪** / **取消** 横幅。
+
+![第 2 步：调整裁剪](./sample/step-2-crop.png)
+
+**3. 拆分误检照片。** 对自动检测合并在一起的区域应用拖框后，会拆出成为
+独立的一张 — 它出现在右侧网格中，带 `new (manual)` 徽标，扫描页上以实心
+绿色框标示。
+
+![第 3 步：拆分误检照片](./sample/step-3-split.png)
+
+**4. 重新检测保留手动裁剪。** 再次检测时手动裁剪不会丢失：扫描页仍以实心
+绿色框绘制你的裁剪区域，提取出的卡片带 **✎ crop** 徽标。
+
+![第 4 步：重新检测后手动裁剪仍保留](./sample/step-4-redetect.png)
+
 ### 项目结构
 
 ```
@@ -364,29 +427,31 @@ cargo run --bin pipeline -- enhance /tmp/out/sheet_p0.png --upscale --colorize -
 ### 技术说明与调优
 
 - 检测将每页缩放到 ≤1600 像素做分割（Canny + Otsu 策略合并、IoU 去重）；
-  提取基于原分辨率整页做透视变换。
+提取基于原分辨率整页做透视变换。
 - 放大输入长边上限 640 像素（256 像素块、32 像素重叠、线性融合）→ 输出 ×4，
-  例如 640×480 → 2560×1920。如需更高质量可在 `enhance.rs` 中调高
-  `MAX_UPSCALE_INPUT`（成本按平方增长）。
+例如 640×480 → 2560×1920。如需更高质量可在 `enhance.rs` 中调高
+`MAX_UPSCALE_INPUT`（成本按平方增长）。
 - 上色在长边 ≤512 像素下运行；预测的色度上采样后按平均饱和度权重与原色度
-  融合（褪色 → 几乎全用 AI 颜色，鲜艳 → 大部分保留原色）。
+融合（褪色 → 几乎全用 AI 颜色，鲜艳 → 大部分保留原色）。
 - 朝向：YuNet 关键点姿态检查每张人脸（眼在鼻上方、鼻在口上方 ⇒ ×3 权重），
-  避免旋转变体误检获胜。SSD 物体检测仅在总分 ≥0.9 且为第二名 1.3 倍以上时
-  才参与决策，否则照片保持 0°。
+避免旋转变体误检获胜。SSD 物体检测仅在总分 ≥0.9 且为第二名 1.3 倍以上时
+才参与决策，否则照片保持 0°。
 - 提取：透视变换后 `trim_white_borders` 裁掉近纯白的扫描边（≥98% 亮度的
-  行/列，每侧上限 30%，至少保留 120 像素）。
+行/列，每侧上限 30%，至少保留 120 像素）。
 - `ml-service` 工作线程独占所有模型句柄（OpenCV `Net` 非 `Send`）；Tauri
-  应用通过通道与它通信，重推理不会阻塞 UI 线程。
+应用通过通道与它通信，重推理不会阻塞 UI 线程。
 
 ### 模型清单
 
-| 文件 | 用途 | 来源 |
-|------|------|------|
-| `yunet.onnx` | 人脸检测（摆向） | [opencv_zoo](https://github.com/opencv/opencv_zoo) |
-| `ssd_mobilenet.caffemodel` + `.prototxt` | 物体检测（摆向后备） | [chuanqi305/MobileNet-SSD](https://github.com/chuanqi305/MobileNet-SSD) |
-| `esrgan_x4.onnx` | ×4 超分辨率 | [anakhiu/realesrgan-onnx](https://huggingface.co/anakhiu/realesrgan-onnx)（Real-ESRGAN x4plus） |
-| `colorizer.caffemodel` + `.prototxt` + `points_in_hull.npy` | 上色 | [richzhang/colorization](https://github.com/richzhang/colorization)（v2） |
-| `gfpgan_1.4.onnx` | 人脸修复 | [facefusion/models-3.0.0](https://huggingface.co/facefusion/models-3.0.0) |
+
+| 文件                                                          | 用途         | 来源                                                                                            |
+| ----------------------------------------------------------- | ---------- | --------------------------------------------------------------------------------------------- |
+| `yunet.onnx`                                                | 人脸检测（摆向）   | [opencv_zoo](https://github.com/opencv/opencv_zoo)                                            |
+| `ssd_mobilenet.caffemodel` + `.prototxt`                    | 物体检测（摆向后备） | [chuanqi305/MobileNet-SSD](https://github.com/chuanqi305/MobileNet-SSD)                       |
+| `esrgan_x4.onnx`                                            | ×4 超分辨率    | [anakhiu/realesrgan-onnx](https://huggingface.co/anakhiu/realesrgan-onnx)（Real-ESRGAN x4plus） |
+| `colorizer.caffemodel` + `.prototxt` + `points_in_hull.npy` | 上色         | [richzhang/colorization](https://github.com/richzhang/colorization)（v2）                       |
+| `gfpgan_1.4.onnx`                                           | 人脸修复       | [facefusion/models-3.0.0](https://huggingface.co/facefusion/models-3.0.0)                     |
+
 
 ---
 
