@@ -91,16 +91,29 @@ works right after installation with no downloads.
 
 > **Signing note**: the bundle carries an ad-hoc signature only. It runs
 > normally on the machine that built it. If you distribute the DMG, Gatekeeper
-> will show "unidentified developer" — right-click → Open the first time, or
-> sign + notarize the app with an Apple Developer ID (e.g. `tauri sign`) before
-> releasing.
+> will show "unidentified developer" on other Macs. On first launch either:
+> - right-click the app → **Open** (once per app), or
+> - remove the quarantine flag with `xattr`:
+>
+>   ```bash
+>   xattr -dr com.apple.quarantine "/Applications/Photo Digitizer.app"
+>   ```
+>
+>   (`xattr` works on a Tauri app exactly like on any other .app bundle — it
+>   removes the quarantine attribute from the bundle and everything inside it;
+>   nothing Tauri-specific interferes.)
+>   中文：也可以运行上面的 xattr 命令清除隔离属性，绕过 Gatekeeper 的
+>   “未受信任的开发者”提示。
+>
+> For distribution, sign + notarize the app with an Apple Developer ID
+> (e.g. `tauri sign`) before releasing.
 
 ### How to use the app
 
 **1. Choose the language.** English or 中文 — top-right of the header. Your
 choice is remembered; the first launch follows the system language.
 
-**2. Load your scan folder.** Browse… (or type the path) and press **Load**.
+**2. Load your scan folder.** Browse… (or type the path and press Enter).
 The sidebar lists every image in the folder (jpg/jpeg/png/tif/tiff/bmp).
 
 **3. Detect photos.** Click a sheet in the sidebar to detect just that sheet,
