@@ -7,7 +7,8 @@ const MARKER: &str = "yunet.onnx";
 
 /// Locate the models directory. Search order:
 /// 1. `$MODELS_DIR`
-/// 2. walk up from the executable (covers `target/debug`, bundled resources)
+/// 2. walk up from the executable (covers `target/debug`, bundled
+///    resources at `Contents/Resources/models`)
 /// 3. walk up from the CWD and `<cwd>/src-tauri` (covers running inside the project)
 pub fn models_dir() -> anyhow::Result<PathBuf> {
     if let Ok(d) = std::env::var("MODELS_DIR") {
@@ -19,9 +20,12 @@ pub fn models_dir() -> anyhow::Result<PathBuf> {
     if let Ok(exe) = std::env::current_exe() {
         let mut dir = exe.parent().map(Path::to_path_buf);
         while let Some(d) = dir {
-            let cand = d.join("models");
-            if cand.join(MARKER).exists() {
-                return Ok(cand);
+            // `<d>/models` for dev trees; `<d>/Resources/models` for the
+            // tauri-launched app bundle (Contents/Resources/models).
+            for cand in [d.join("models"), d.join("Resources").join("models")] {
+                if cand.join(MARKER).exists() {
+                    return Ok(cand);
+                }
             }
             dir = d.parent().map(Path::to_path_buf);
         }

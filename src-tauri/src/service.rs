@@ -117,9 +117,10 @@ fn run_loop(rx: Receiver<Msg>) {
             Msg::Detect { path, manual, reply } => {
                 let r = (|| -> Result<SheetDetected> {
                     std::fs::create_dir_all(paths::jobs_dir())?;
-                    let d = det.get_or_insert_with(|| {
-                        Detectors::load().expect("failed to load detectors")
-                    });
+                    if det.is_none() {
+                        det = Some(Detectors::load()?);
+                    }
+                    let d = det.as_mut().unwrap();
                     let page = enhance::load_mat(&path)?;
                     let (quads, photos) = pipeline::detect_and_extract(&page, d)?;
                     // Overlay manual crop boxes so the preview keeps showing
@@ -208,9 +209,10 @@ fn run_loop(rx: Receiver<Msg>) {
             Msg::ReExtract { path, quad, id, reply } => {
                 let r = (|| -> Result<DetectedPhoto> {
                     std::fs::create_dir_all(paths::jobs_dir())?;
-                    let d = det.get_or_insert_with(|| {
-                        Detectors::load().expect("failed to load detectors")
-                    });
+                    if det.is_none() {
+                        det = Some(Detectors::load()?);
+                    }
+                    let d = det.as_mut().unwrap();
                     anyhow::ensure!(quad.len() == 8, "quad must have 8 coordinates");
                     let pts: Vec<Point2f> = quad
                         .chunks_exact(2)
@@ -289,9 +291,10 @@ fn run_loop(rx: Receiver<Msg>) {
                         } else {
                             let mut last = 0f32;
                             mat = {
-                                let e = enh.get_or_insert_with(|| {
-                                    Enhancers::load().expect("failed to load enhancers")
-                                });
+                                if enh.is_none() {
+                                    enh = Some(Enhancers::load()?);
+                                }
+                                let e = enh.as_mut().unwrap();
                                 e.upscale(
                                     &mat,
                                     &mut |f| {
@@ -314,9 +317,10 @@ fn run_loop(rx: Receiver<Msg>) {
                         }
                         progress(stage, stages, "colorizing…");
                         mat = {
-                            let e = enh.get_or_insert_with(|| {
-                                Enhancers::load().expect("failed to load enhancers")
-                            });
+                            if enh.is_none() {
+                                enh = Some(Enhancers::load()?);
+                            }
+                            let e = enh.as_mut().unwrap();
                             e.colorize(&mat)?
                         };
                     }
@@ -327,9 +331,10 @@ fn run_loop(rx: Receiver<Msg>) {
                         progress(stage, stages, "restoring faces…");
                         let mut last = 0usize;
                         mat = {
-                            let e = enh.get_or_insert_with(|| {
-                                Enhancers::load().expect("failed to load enhancers")
-                            });
+                            if enh.is_none() {
+                                enh = Some(Enhancers::load()?);
+                            }
+                            let e = enh.as_mut().unwrap();
                             enhance::restore_faces(e, &mat, &mut |done, total| {
                                 if done > last || done == total {
                                     last = done;
