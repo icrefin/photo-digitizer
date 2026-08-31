@@ -90,6 +90,8 @@ const I18N = {
     aboutBtn: "About",
     aboutVersion: "Version", aboutBuilt: "Built",
     aboutPlatform: "Platform", aboutClose: "OK",
+    aboutOpenSource: "Open source",
+    aboutCopyright: "Copyright",
     aboutFailed: "About failed: {0}",
     modalInfo: "original {0}  →  enhanced {1}",
     modalInfoNoEnh: "{0} · run Enhance to see AI output here",
@@ -169,6 +171,8 @@ const I18N = {
     aboutBtn: "关于",
     aboutVersion: "版本", aboutBuilt: "构建时间",
     aboutPlatform: "平台", aboutClose: "好的",
+    aboutOpenSource: "开源组件",
+    aboutCopyright: "版权",
     aboutFailed: "关于信息获取失败：{0}",
     modalInfo: "原图 {0}  →  增强后 {1}",
     modalInfoNoEnh: "{0} · 运行增强后可在此查看 AI 输出",
@@ -524,6 +528,21 @@ async function initPhantomEngine() {
 
 /* ---------- about & version ---------- */
 
+// Projects this app is built on (licenses verified from each project's
+// repository). Additional per-project license terms apply.
+const OPEN_SOURCE = [
+  ["Tauri", "Apache-2.0 / MIT"],
+  ["OpenCV", "Apache-2.0"],
+  ["ONNX Runtime", "MIT"],
+  ["Real-ESRGAN", "BSD-3-Clause"],
+  ["GFPGAN", "Apache-2.0"],
+  ["YuNet (OpenCV face detection)", "Apache-2.0"],
+  ["Zhang et al. colorization", "BSD-2-Clause"],
+  ["Dreamoving Phantom (PASD)", "Apache-2.0"],
+  ["Diffusers (PASD runtime)", "Apache-2.0"],
+  ["Stable Diffusion 1.5 (model weights)", "CreativeML Open RAIL-M"],
+];
+
 let aboutInfo = null;
 
 function fmtTs(ts) {
@@ -552,6 +571,9 @@ async function initAbout() {
     $("aboutBuilt").textContent = fmtTs(aboutInfo.build_ts);
     $("aboutPlatform").textContent = `${aboutInfo.platform} / ${aboutInfo.arch}`;
   }
+  $("aboutLicenses").innerHTML = OPEN_SOURCE.map(
+    ([name, lic]) => `<div class="lic-row"><span>${name}</span><b>${lic}</b></div>`
+  ).join("");
   $("btnAbout").onclick = openAbout;
   $("aboutClose").onclick = () => $("aboutDlg").close();
   // Menu bar → Photo Digitizer → About Photo Digitizer opens the same dialog.

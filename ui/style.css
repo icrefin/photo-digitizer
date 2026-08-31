@@ -253,5 +253,10 @@ main { flex: 1; display: grid; grid-template-columns: 230px 1fr 250px; min-heigh
   padding: 7px 0; border-top: 1px solid var(--line); font-size: 13px;
 }
 .about-row span { color: var(--muted); }
+.about-sec { margin-top: 16px; padding: 4px 0; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.about-list { max-height: 190px; overflow-y: auto; border-top: 1px solid var(--line); }
+.lic-row { display: flex; justify-content: space-between; gap: 24px; padding: 5px 0; font-size: 12.5px; }
+.lic-row span { color: var(--text); }
+.lic-row b { color: var(--muted); font-weight: 500; }
 .about-actions { margin-top: 18px; text-align: right; }
 .hidden { display: none !important; }
