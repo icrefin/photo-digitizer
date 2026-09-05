@@ -52,7 +52,7 @@ const I18N = {
     save: "Save",
     jpgOpt: "JPEG (small)", pngOpt: "PNG (lossless)",
     saveSelected: "Save selected…",
-    tip: "Click a photo to compare original ↔ enhanced. Scroll to zoom each pane, drag to pan, double-click to reset. Use ⟲/⟳ to fix rotation and ✎ to adjust the crop by dragging its corners on the sheet — a manually cropped photo keeps its crop when sheets are re-detected, and can be reset to its original from the compare window. If two photos were detected as one, right-click the sheet and drag over one of them to extract it as a separate photo.",
+    tip: "Click a photo to compare original ↔ enhanced. Scroll to zoom each pane, drag to pan, double-click to reset. Use ⟲/⟳ to fix rotation and ✎ to adjust the crop by dragging its corners on the sheet — the right pane previews the crop live as you adjust it. A manually cropped photo keeps its crop when sheets are re-detected, and can be reset to its original from the compare window. If two photos were detected as one, right-click the sheet and drag over one of them to extract it as a separate photo.",
     resetEnh: "Reset to original",
     compare: "Compare",
     tagOriginal: "original", tagEnhanced: "enhanced",
@@ -106,6 +106,7 @@ const I18N = {
     rotCcw: "Rotate 90° counter-clockwise",
     rotCw: "Rotate 90° clockwise",
     adjustCrop: "Adjust the crop on the sheet",
+    cropPreview: "Crop preview",
     manualBadgeTip: "Manually cropped — auto-detection keeps this crop",
     clickCompare: "Click to compare",
   },
@@ -133,7 +134,7 @@ const I18N = {
     save: "保存",
     jpgOpt: "JPEG（小）", pngOpt: "PNG（无损）",
     saveSelected: "保存选中…",
-    tip: "点击照片可对比原图与增强效果。滚动缩放，拖动平移，双击复位。使用 ⟲/⟳ 修正旋转，✎ 在扫描页上拖动角点调整裁剪 — 手动裁剪过的照片在重新检测时会保留该裁剪，并可在对比窗口中恢复原图。若自动检测将两张照片误合为一张，可在扫描页上右键并拖动框选其中一张，将其单独提取出来。",
+    tip: "点击照片可对比原图与增强效果。滚动缩放，拖动平移，双击复位。使用 ⟲/⟳ 修正旋转，✎ 在扫描页上拖动角点调整裁剪 — 右侧会实时预览裁剪结果。手动裁剪过的照片在重新检测时会保留该裁剪，并可在对比窗口中恢复原图。若自动检测将两张照片误合为一张，可在扫描页上右键并拖动框选其中一张，将其单独提取出来。",
     resetEnh: "恢复原图",
     compare: "对比",
     tagOriginal: "原图", tagEnhanced: "增强后",
@@ -187,6 +188,7 @@ const I18N = {
     rotCcw: "逆时针旋转 90°",
     rotCw: "顺时针旋转 90°",
     adjustCrop: "在扫描页上调整裁剪",
+    cropPreview: "裁剪预览",
     manualBadgeTip: "手动裁剪 — 自动检测将保留此裁剪",
     clickCompare: "点击对比",
   },
@@ -764,6 +766,9 @@ function enterCropEdit(id) {
     overlayNodes = null;
     $("cropText").textContent = t("cropTextEdit", id.split("#")[1]);
     $("cropTools").classList.remove("hidden");
+    showCropPreview(true);
+    ensureCleanSheet(m.source_file);
+    renderCropPreview();
     drawQuadOverlay();
   };
   if (img.complete && img.naturalWidth) applyMapping();
@@ -783,6 +788,7 @@ function exitCropEdit() {
   if (drawPoly) { drawPoly.remove(); drawPoly = null; }
   state.editing = null;
   overlayNodes = null;
+  showCropPreview(false);
   $("cropTools").classList.add("hidden");
   $("quadOverlay").innerHTML = "";
 }
@@ -821,6 +827,8 @@ function startDrawNewCrop() {
   drawPoly.setAttribute("stroke-dasharray", "8 6");
   svg.appendChild(drawPoly);
   $("cropText").textContent = t("drawHint");
+  showCropPreview(true);
+  ensureCleanSheet(file);
   $("cropTools").classList.remove("hidden");
 }
 
@@ -838,6 +846,7 @@ function onDrawDown(e) {
     const x1 = Math.max(drawing.anchor[0], q[0]);
     const y1 = Math.max(drawing.anchor[1], q[1]);
     drawPoly.setAttribute("points", `${x0},${y0} ${x1},${y0} ${x1},${y1} ${x0},${y1}`);
+    scheduleCropPreview([[x0, y0], [x1, y0], [x1, y1], [x0, y1]]);
   };
   const up = (ev) => {
     svg.removeEventListener("pointermove", move);
@@ -860,6 +869,7 @@ function finishDraw(quad) {
   state.editing = { id: null, file: state.activeFile, quad };
   overlayNodes = null;
   $("cropText").textContent = t("drawAdjust");
+  renderCropPreview();
   drawQuadOverlay();
 }
 
@@ -975,6 +985,7 @@ function onHandleDown(e) {
       Math.max(0, Math.min(imgNaturalH(), vy)),
     ];
     updateOverlayPositions();
+    scheduleCropPreview();
   };
   const up = () => {
     svg.removeEventListener("pointermove", move);
@@ -1082,6 +1093,162 @@ async function applyCrop() {
     setProgress(null);
     toast(t("recropFailed", err));
   }
+}
+
+/* ---------- live crop preview (right pane while a crop is edited) ----------
+   While the user drags corners (or draws a new box), the grid pane is
+   replaced by a realtime preview of what the crop will extract. The warp is
+   done client-side on a canvas from a box-free copy of the sheet: the
+   on-screen sheet image has the crop boxes baked into it, so we ask the
+   backend for the same preview with an empty quad list. Two affine-warped
+   triangles approximate the perspective correction applied on Apply. */
+
+let cleanSheet = null;       // Image of the active sheet without drawn boxes
+let cleanSheetFile = null;
+let cleanSheetReq = 0;
+let previewRaf = 0;
+let pendingPreviewQuad = null;
+
+function showCropPreview(show) {
+  $("cropPreview").classList.toggle("hidden", !show);
+}
+
+function ensureCleanSheet(file) {
+  if (cleanSheetFile === file && cleanSheet?.naturalWidth) return;
+  const req = ++cleanSheetReq;
+  cleanSheet = null;
+  cleanSheetFile = null;
+  invoke("sheet_preview_with_quads", { dir: state.dir, file, quads: [], manual: [] })
+    .then((b64) => new Promise((res, rej) => {
+      const img = new Image();
+      img.onload = () => res(img);
+      img.onerror = rej;
+      img.src = `data:image/jpeg;base64,${b64}`;
+    }))
+    .then((img) => {
+      if (req !== cleanSheetReq) return; // a newer edit session started
+      cleanSheet = img;
+      cleanSheetFile = file;
+      renderCropPreview();
+    })
+    .catch(() => { /* fall back to the boxed sheet image */ });
+}
+
+function scheduleCropPreview(quad) {
+  pendingPreviewQuad = quad ?? null;
+  if (previewRaf) return;
+  previewRaf = requestAnimationFrame(() => {
+    previewRaf = 0;
+    renderCropPreview(pendingPreviewQuad ?? undefined);
+  });
+}
+
+function renderCropPreview(quad) {
+  quad ??= state.editing?.quad;
+  const canvas = $("cropCanvas");
+  if (!quad || !canvas) return;
+  const src = cleanSheet?.naturalWidth ? cleanSheet : $("sheetImg");
+  if (!src.naturalWidth) return;
+  const d = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+  // same rect size the backend extracts (max of opposite edges)
+  const w = Math.max(d(quad[0], quad[1]), d(quad[3], quad[2]));
+  const h = Math.max(d(quad[0], quad[3]), d(quad[1], quad[2]));
+  if (w < 2 || h < 2) { canvas.width = 0; canvas.height = 0; return; }
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const k = Math.min(1, 640 * dpr / Math.max(w, h));
+  const W = Math.round(w * k);
+  const H = Math.round(h * k);
+  canvas.width = W;
+  canvas.height = H;
+  $("cropDims").textContent = `${Math.round(w)} × ${Math.round(h)} px`;
+  const ctx = canvas.getContext("2d");
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  // Square-to-quad homography (dest rect -> source quad), the same mapping
+  // warp_perspective applies on Apply. Rendered as a grid of small affine
+  // triangles so the perspective correction is faithful even for strongly
+  // trapezoidal quads, where a single affine per half visibly shears.
+  const A = quad[1][0] - quad[2][0];
+  const B = quad[3][0] - quad[2][0];
+  const C = quad[2][0] - quad[1][0] - quad[3][0] + quad[0][0];
+  const A2 = quad[1][1] - quad[2][1];
+  const B2 = quad[3][1] - quad[2][1];
+  const C2 = quad[2][1] - quad[1][1] - quad[3][1] + quad[0][1];
+  const det = A * B2 - B * A2;
+  let hg = 0;
+  let hv = 0;
+  if (Math.abs(det) > 1e-9 && (Math.abs(C) > 1e-9 || Math.abs(C2) > 1e-9)) {
+    hg = (C * B2 - C2 * B) / det;
+    hv = (A * C2 - A2 * C) / det;
+  }
+  const [x0, y0] = quad[0];
+  const px = quad[1][0] * hg + quad[1][0] - x0;   // u-direction numerator
+  const qx = quad[3][0] * hv + quad[3][0] - x0;   // v-direction numerator
+  const py = quad[1][1] * hg + quad[1][1] - y0;
+  const qy = quad[3][1] * hv + quad[3][1] - y0;
+  const mapPt = (X, Y) => {
+    const u = X / W;
+    const v = Y / H;
+    const s = Math.max(hg * u + hv * v + 1, 0.05);
+    return [(px * u + qx * v + x0) / s, (py * u + qy * v + y0) / s];
+  };
+  const nx = Math.max(2, Math.min(32, Math.round(W / 24)));
+  const ny = Math.max(2, Math.min(32, Math.round(H / 24)));
+  const grid = [];
+  for (let j = 0; j <= ny; j++) {
+    const row = [];
+    for (let i = 0; i <= nx; i++) row.push(mapPt((i * W) / nx, (j * H) / ny));
+    grid.push(row);
+  }
+  for (let j = 0; j < ny; j++) {
+    for (let i = 0; i < nx; i++) {
+      const dTL = [(i * W) / nx, (j * H) / ny];
+      const dTR = [((i + 1) * W) / nx, (j * H) / ny];
+      const dBR = [((i + 1) * W) / nx, ((j + 1) * H) / ny];
+      const dBL = [(i * W) / nx, ((j + 1) * H) / ny];
+      warpTriangle(ctx, src, [grid[j][i], grid[j][i + 1], grid[j + 1][i + 1]], [dTL, dTR, dBR]);
+      warpTriangle(ctx, src, [grid[j][i], grid[j + 1][i + 1], grid[j + 1][i]], [dTL, dBR, dBL]);
+    }
+  }
+}
+
+function warpTriangle(ctx, img, s, d) {
+  const [s0, s1, s2] = s;
+  const [d0, d1, d2] = d;
+  const u1 = [s1[0] - s0[0], s1[1] - s0[1]];
+  const u2 = [s2[0] - s0[0], s2[1] - s0[1]];
+  const v1 = [d1[0] - d0[0], d1[1] - d0[1]];
+  const v2 = [d2[0] - d0[0], d2[1] - d0[1]];
+  const det = u1[0] * u2[1] - u1[1] * u2[0];
+  if (!isFinite(det) || Math.abs(det) < 1e-6) return;
+  // Matrix M with M·u_i = v_i (deltas as columns): M = V·U⁻¹. Getting the
+  // product order wrong transposes the mapping and shears skewed triangles.
+  const a = (v1[0] * u2[1] - v2[0] * u1[1]) / det;
+  const c = (v2[0] * u1[0] - v1[0] * u2[0]) / det;
+  const b = (v1[1] * u2[1] - v2[1] * u1[1]) / det;
+  const dd = (v2[1] * u1[0] - v1[1] * u2[0]) / det;
+  ctx.save();
+  // widen the clip a touch so the two triangle halves meet without a seam
+  const cx = (d0[0] + d1[0] + d2[0]) / 3;
+  const cy = (d0[1] + d1[1] + d2[1]) / 3;
+  const grow = (p) => {
+    const dx = p[0] - cx;
+    const dy = p[1] - cy;
+    const len = Math.hypot(dx, dy) || 1;
+    return [p[0] + (dx / len) * 0.75, p[1] + (dy / len) * 0.75];
+  };
+  const g0 = grow(d0);
+  const g1 = grow(d1);
+  const g2 = grow(d2);
+  ctx.beginPath();
+  ctx.moveTo(g0[0], g0[1]);
+  ctx.lineTo(g1[0], g1[1]);
+  ctx.lineTo(g2[0], g2[1]);
+  ctx.closePath();
+  ctx.clip();
+  ctx.transform(a, b, c, dd, d0[0] - a * s0[0] - c * s0[1], d0[1] - b * s0[0] - dd * s0[1]);
+  ctx.drawImage(img, 0, 0);
+  ctx.restore();
 }
 
 /* ---------- save ---------- */

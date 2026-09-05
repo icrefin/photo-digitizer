@@ -77,6 +77,12 @@
               <span data-i18n="empty2">Each sheet is split into individual photos, straightened and trimmed.</span>
             </p>
           </div>
+          <!-- Live crop preview: covers the grid while a crop is being edited -->
+          <div id="cropPreview" class="hidden">
+            <div class="pane-title" data-i18n="cropPreview">Crop preview</div>
+            <canvas id="cropCanvas" width="0" height="0"></canvas>
+            <div id="cropDims" class="muted small"></div>
+          </div>
         </div>
       </div>
     </section>
